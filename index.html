@@ -1,47 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OEE Modern Dashboard</title>
+  <title>TFC | OEE Plant Dashboard</title>
 
-  <!-- Tailwind CSS (Play CDN) + custom config -->
+  <!-- Favicon & browser theme color (โทนเดียวกับโลโก้) -->
+  <link rel="icon" type="image/png" href="assets/tfc-logo.png">
+  <meta name="theme-color" content="#0b2340">
+
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', 'Noto Sans Thai', 'sans-serif'] },
+          colors: { brand: { navy: '#0b2340', deep: '#06162a', sky: '#38bdf8' } },
           boxShadow: { soft: '0 1px 2px rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.12)' }
         }
       }
     };
   </script>
 
-  <!-- Chart.js (pinned version) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- ตรวจสอบธีมเริ่มต้น (กันหน้าจอกะพริบ) -->
+  <script>
+    (function () {
+      const t = localStorage.getItem('theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
 
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- SheetJS (Excel / CSV) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF + AutoTable (PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Reusable component classes -->
   <style type="text/tailwindcss">
     @layer components {
-      .card          { @apply rounded-2xl border border-slate-200/70 bg-white p-6 shadow-soft; }
-      .card-title    { @apply text-base font-semibold text-slate-900; }
-      .card-subtitle { @apply text-xs text-slate-500; }
+      .card          { @apply rounded-2xl border border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-soft transition-colors duration-300; }
+      .card-title    { @apply text-base font-semibold text-slate-900 dark:text-white; }
+      .card-subtitle { @apply text-xs text-slate-500 dark:text-slate-400; }
       .btn           { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60; }
-      .btn-primary   { @apply bg-blue-600 text-white shadow-sm hover:bg-blue-700; }
-      .btn-secondary { @apply border border-slate-200 bg-white text-slate-700 hover:bg-slate-50; }
-      .input         { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100; }
-      .page-eyebrow  { @apply text-xs font-semibold uppercase tracking-wider text-blue-600; }
-      .page-heading  { @apply mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl; }
-      .page-desc     { @apply mt-1 text-sm text-slate-500; }
+      .btn-primary   { @apply bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-500; }
+      .btn-secondary { @apply border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600; }
+      .btn-export    { @apply inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition dark:border-slate-600 dark:bg-slate-600 dark:text-slate-200; }
+      .input         { @apply w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900; }
+      .page-eyebrow  { @apply text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-sky-400; }
+      .page-heading  { @apply mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl; }
+      .page-desc     { @apply mt-1 text-sm text-slate-500 dark:text-slate-400; }
     }
   </style>
 
@@ -50,63 +69,100 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-    /* Page switching */
     .page-section { display: none; }
     .page-section.is-active { display: block; animation: fadeUp .35s ease-out; }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-    /* Sidebar active item */
-    .nav-item.is-active { background: linear-gradient(90deg, rgba(59,130,246,.18), rgba(59,130,246,0)); color: #fff; }
-    .nav-item.is-active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 9999px; background: #60a5fa; }
-    .nav-item.is-active i { color: #60a5fa; }
+    .nav-item.is-active { background: linear-gradient(90deg, rgba(56,189,248,.18), rgba(56,189,248,0)); color: #fff; }
+    .nav-item.is-active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 9999px; background: #38bdf8; }
+    .nav-item.is-active i { color: #38bdf8; }
 
-    /* KPI ring gauge */
-    .ring-progress { transition: stroke-dashoffset .8s cubic-bezier(.4,0,.2,1); }
-
-    /* Live pulse for RUNNING badge */
     @keyframes pulseRing {
       0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.55); }
       70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
       100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
     }
     .live-pulse { animation: pulseRing 2s infinite; }
-
-    /* Toast */
     .toast-enter { animation: toastIn .3s ease-out; }
     @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation: none !important; transition: none !important; }
-    }
   </style>
 </head>
 
-<body class="bg-slate-100 font-sans text-slate-800 antialiased">
-<div class="flex h-screen w-full overflow-hidden">
+<body class="bg-slate-100 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200 antialiased transition-colors duration-300">
 
-  <!-- ===================== SIDEBAR ===================== -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 flex w-64 shrink-0 -translate-x-full flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-white shadow-2xl transition-transform duration-300 ease-out md:static md:translate-x-0">
-    <div class="flex h-16 items-center justify-between border-b border-white/5 px-6">
-      <div class="flex items-center gap-3">
-        <div class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-          <i class="fa-solid fa-industry text-sm"></i>
-        </div>
-        <div class="leading-tight">
-          <p class="text-base font-bold tracking-wide">OEE DASH</p>
-          <p class="text-[11px] text-slate-400">Production Monitor</p>
-        </div>
+<!-- ===================== LOGIN OVERLAY ===================== -->
+<div id="login-overlay" class="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-brand-navy to-slate-950 p-4 transition-opacity duration-300">
+  <div class="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/20 blur-3xl"></div>
+
+  <div class="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl dark:bg-slate-800">
+    <!-- แบนเนอร์โลโก้ -->
+    <div class="relative bg-brand-navy">
+      <img src="assets/tfc-logo.png" alt="TFC - Techno Foam Co., Ltd." class="block h-auto w-full"
+           onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
+      <div class="hidden px-6 py-8 text-center">
+        <p class="text-4xl font-black tracking-[0.3em] text-sky-300">TFC</p>
+        <p class="mt-1 text-sm text-slate-300">Techno Foam Co., Ltd.</p>
       </div>
+      <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent"></div>
+    </div>
+
+    <div class="p-8">
+      <div class="mb-6 text-center">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white">OEE Dashboard</h2>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Please sign in to access</p>
+      </div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label for="loginUser" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Username</label>
+          <input type="text" id="loginUser" class="input" placeholder="Username" autocomplete="username" required>
+        </div>
+        <div>
+          <label for="loginPass" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
+          <input type="password" id="loginPass" class="input" placeholder="••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary mt-4 h-10 w-full">Sign In <i class="fa-solid fa-arrow-right ml-1"></i></button>
+        <p id="login-error" class="mt-2 hidden rounded bg-red-100 p-2 text-center text-xs font-semibold text-red-500 dark:bg-red-900/30">Invalid Username or Password!</p>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  // ซ่อนหน้า Login ทันทีถ้าล็อกอินอยู่แล้ว (กันกะพริบ)
+  if (sessionStorage.getItem('tfc-oee-user')) document.getElementById('login-overlay').classList.add('hidden');
+</script>
+
+<div class="flex h-screen w-full overflow-hidden">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 flex w-64 shrink-0 -translate-x-full flex-col bg-gradient-to-b from-brand-navy via-slate-900 to-slate-950 text-white shadow-2xl transition-transform duration-300 ease-out md:static md:translate-x-0">
+    <div class="flex h-16 items-center justify-between border-b border-white/5 px-5">
+      <button id="logoHome" type="button" class="group flex items-center" title="Plant Overview">
+        <img src="assets/tfc-logo.png" alt="TFC - Techno Foam Co., Ltd."
+             class="h-11 w-auto rounded-md shadow-lg shadow-sky-500/10 ring-1 ring-white/10 transition group-hover:ring-sky-400/40"
+             onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');">
+        <span class="hidden text-2xl font-black tracking-[0.25em] text-sky-300">TFC</span>
+      </button>
       <button id="closeSidebar" type="button" class="text-slate-400 transition hover:text-white md:hidden" aria-label="Close menu">
         <i class="fa-solid fa-xmark text-xl"></i>
       </button>
     </div>
 
-    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-6" aria-label="Main navigation">
+    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-6">
+      <div class="mx-3 mb-6 flex items-center gap-2 rounded-lg bg-sky-500/10 px-3 py-2 ring-1 ring-sky-400/20">
+        <i class="fa-solid fa-microchip text-xs text-sky-400"></i>
+        <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">OEE Production System</span>
+      </div>
+
       <p class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Main Menu</p>
 
+      <button type="button" data-section="overview" class="nav-item is-active relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">
+        <i class="fa-solid fa-border-all w-5 text-center"></i><span>Plant Overview</span>
+      </button>
       <button type="button" data-section="dashboard" class="nav-item relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">
-        <i class="fa-solid fa-chart-pie w-5 text-center"></i><span>Dashboard</span>
+        <i class="fa-solid fa-chart-pie w-5 text-center"></i><span>Machine Details</span>
         <span class="ml-auto rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400">LIVE</span>
       </button>
       <button type="button" data-section="oee-product" class="nav-item relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">
@@ -125,13 +181,17 @@
       </button>
     </nav>
 
+    <!-- User card -->
     <div class="border-t border-white/5 p-4">
-      <div class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/5">
-        <div class="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold ring-2 ring-white/10">A</div>
-        <div class="min-w-0">
-          <p class="truncate text-sm font-medium">Admin User</p>
-          <p class="truncate text-xs text-slate-400">Production Dept</p>
+      <div class="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
+        <div class="grid h-8 w-8 place-items-center rounded-full bg-sky-500/20 text-sky-300"><i class="fa-solid fa-user text-xs"></i></div>
+        <div class="min-w-0 flex-1">
+          <p id="sidebar-user" class="truncate text-sm font-semibold">—</p>
+          <p class="text-[11px] text-slate-400">Signed in</p>
         </div>
+        <button type="button" onclick="logout()" class="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-red-400" title="Logout">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
       </div>
     </div>
   </aside>
@@ -140,86 +200,95 @@
 
   <!-- ===================== MAIN COLUMN ===================== -->
   <div class="flex min-w-0 flex-1 flex-col">
-
     <!-- Header -->
-    <header class="z-10 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header class="z-10 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur transition-colors duration-300 dark:border-slate-700 dark:bg-slate-800/80 sm:px-6 lg:px-8">
       <div class="flex min-w-0 items-center gap-3">
-        <button id="openSidebar" type="button" class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:hidden" aria-label="Open menu">
-          <i class="fa-solid fa-bars text-lg"></i>
-        </button>
-        <div class="hidden min-w-0 lg:block">
-          <p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">OEE Dash</p>
-          <p id="page-title" class="truncate text-sm font-semibold text-slate-800">Dashboard</p>
+        <button id="openSidebar" type="button" class="rounded-lg p-2 text-slate-500 transition md:hidden" aria-label="Open menu"><i class="fa-solid fa-bars text-lg"></i></button>
+        <img src="assets/tfc-logo.png" alt="TFC" class="h-8 w-auto rounded md:hidden" onerror="this.remove()">
+        <div class="hidden min-w-0 sm:block">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">TFC · OEE Dashboard</p>
+          <p id="page-title" class="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">Plant Overview</p>
         </div>
-        <div class="mx-2 hidden h-8 w-px bg-slate-200 lg:block"></div>
-        <form id="searchForm" role="search" class="hidden items-center rounded-lg border border-transparent bg-slate-100 px-3 py-1.5 transition focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 sm:flex">
-          <i class="fa-solid fa-magnifying-glass text-sm text-slate-400"></i>
-          <input id="searchInput" type="search" autocomplete="off" placeholder="Search Job No / Part..." class="ml-2 w-40 bg-transparent text-sm outline-none placeholder:text-slate-400 lg:w-60">
-          <kbd class="ml-2 hidden rounded border border-slate-300 bg-white px-1.5 text-[10px] font-semibold text-slate-400 lg:inline">/</kbd>
-        </form>
+        <!-- Global Machine Selector (แสดงได้ทั้งมือถือและเดสก์ท็อป) -->
+        <select id="globalMachineSelect" class="input hidden h-8 w-auto cursor-pointer border-none bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-sky-400" aria-label="Select machine"></select>
       </div>
 
-      <div class="flex items-center gap-2 sm:gap-4">
-        <span id="conn-status" class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"></span>
-        <div class="hidden h-8 w-px bg-slate-200 sm:block"></div>
-        <div class="hidden text-right sm:block">
-          <p id="clock-time" class="text-sm font-semibold tabular-nums text-slate-800">--:--:--</p>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span id="conn-status" class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"></span>
+
+        <!-- Export buttons -->
+        <div class="hidden items-center gap-1.5 rounded-lg bg-slate-100 p-1 dark:bg-slate-700/50 sm:flex">
+          <button type="button" onclick="exportReport('csv')" class="btn-export hover:text-emerald-600" title="Export CSV"><i class="fa-solid fa-file-csv"></i><span class="hidden xl:inline">CSV</span></button>
+          <button type="button" onclick="exportReport('excel')" class="btn-export hover:text-emerald-600" title="Export Excel"><i class="fa-solid fa-file-excel"></i><span class="hidden xl:inline">Excel</span></button>
+          <button type="button" onclick="exportReport('pdf')" class="btn-export hover:text-red-600" title="Export PDF Report"><i class="fa-solid fa-file-pdf"></i><span class="hidden xl:inline">PDF</span></button>
+        </div>
+
+        <div class="hidden text-right lg:block">
+          <p id="clock-time" class="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-200">--:--:--</p>
           <p id="clock-date" class="text-[11px] text-slate-400">--</p>
         </div>
-        <button type="button" class="relative rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Notifications">
-          <i class="fa-regular fa-bell text-lg"></i>
-          <span class="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500"></span>
-        </button>
+
+        <div class="flex items-center gap-1 border-l border-slate-200 pl-2 dark:border-slate-700 sm:pl-3">
+          <button id="themeToggle" type="button" class="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700" title="Toggle theme">
+            <i id="themeToggleIconDark" class="fa-solid fa-moon text-lg hidden"></i>
+            <i id="themeToggleIconLight" class="fa-solid fa-sun text-lg"></i>
+          </button>
+          <button type="button" onclick="logout()" class="rounded-full p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30" title="Logout">
+            <i class="fa-solid fa-arrow-right-from-bracket text-lg"></i>
+          </button>
+        </div>
       </div>
     </header>
 
     <main id="main" class="flex flex-1 flex-col overflow-y-auto">
       <div class="mx-auto w-full max-w-[1600px] flex-1 p-4 sm:p-6 lg:p-8">
 
-        <!-- ===================== DASHBOARD ===================== -->
+        <!-- Connection banner (Demo / Offline) -->
+        <div id="conn-banner" class="mb-6 hidden items-center gap-3 rounded-xl border px-4 py-3 text-sm"></div>
+
+        <!-- ===================== 1) PLANT OVERVIEW ===================== -->
+        <section id="section-overview" class="page-section is-active">
+          <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p class="page-eyebrow">All Machines Monitoring</p>
+              <h1 class="page-heading">Plant Overview</h1>
+              <p class="page-desc">Real-time status of all production machines</p>
+            </div>
+            <button type="button" onclick="manualRefresh(this)" class="btn btn-secondary"><i class="fa-solid fa-rotate-right"></i> Refresh Data</button>
+          </div>
+          <div id="overview-stats" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"></div>
+          <div id="overview-grid" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="card col-span-full py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading machines...</div>
+          </div>
+        </section>
+
+        <!-- ===================== 2) MACHINE DETAILS ===================== -->
         <section id="section-dashboard" class="page-section">
           <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p class="page-eyebrow">Production Monitoring</p>
-              <h1 id="dash-machine-name" class="page-heading">AUTO PUNCHING PH4</h1>
-              <p class="page-desc">Last updated: <span id="last-updated" class="font-medium text-slate-700">—</span></p>
+              <p class="page-eyebrow">Machine Details</p>
+              <h1 id="dash-machine-name" class="page-heading">Machine —</h1>
+              <p class="page-desc">Last updated: <span id="last-updated" class="font-medium text-slate-700 dark:text-slate-300">—</span></p>
             </div>
-            <div class="flex gap-2">
-              <button id="btnRefresh" type="button" class="btn btn-secondary"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
-              <button id="btnExport" type="button" class="btn btn-primary"><i class="fa-solid fa-file-excel"></i> Export CSV</button>
-            </div>
-          </div>
-
-          <!-- Demo mode banner -->
-          <div id="demo-banner" class="mb-6 hidden items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <i class="fa-solid fa-flask"></i>
-            <p><b>Demo mode:</b> Cannot reach the API — showing simulated data. Retrying automatically…</p>
+            <button type="button" onclick="manualRefresh(this)" class="btn btn-secondary"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
           </div>
 
           <!-- Live Job Banner -->
-          <div class="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg shadow-blue-600/20">
-            <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"></div>
-            <div class="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-indigo-400/20 blur-2xl"></div>
-
+          <div class="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-brand-navy p-6 text-white shadow-lg shadow-blue-600/20">
+            <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-sky-300/10 blur-2xl"></div>
             <div class="relative grid gap-6 lg:grid-cols-[1.2fr_1.5fr_auto] lg:items-center lg:gap-10">
               <div class="flex items-center gap-4">
-                <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 text-2xl ring-1 ring-white/20">
-                  <i class="fa-solid fa-clipboard-list"></i>
-                </div>
+                <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 text-2xl ring-1 ring-white/20"><i class="fa-solid fa-clipboard-list"></i></div>
                 <div class="min-w-0">
                   <p class="text-xs font-semibold uppercase tracking-wider text-blue-100">Current Job</p>
                   <h2 id="val-job-no" class="truncate text-2xl font-bold">—</h2>
                   <p id="val-part-name" class="truncate text-sm text-blue-100">Loading...</p>
                 </div>
               </div>
-
               <div>
                 <div class="mb-2 flex items-end justify-between gap-2">
                   <p class="text-xs font-semibold uppercase tracking-wider text-blue-100">Production Progress</p>
-                  <p class="tabular-nums">
-                    <span id="val-produced" class="text-2xl font-bold">0</span>
-                    <span class="text-blue-100">/ <span id="val-target">0</span> pcs</span>
-                  </p>
+                  <p class="tabular-nums"><span id="val-produced" class="text-2xl font-bold">0</span><span class="text-blue-100"> / <span id="val-target">0</span> pcs</span></p>
                 </div>
                 <div class="h-3 w-full overflow-hidden rounded-full bg-white/20">
                   <div id="progress-bar" class="h-full rounded-full bg-white transition-all duration-700 ease-out" style="width:0%"></div>
@@ -229,7 +298,6 @@
                   <span>Remaining: <b id="val-remaining" class="text-white">0</b> pcs</span>
                 </div>
               </div>
-
               <div>
                 <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-100">Machine Status</p>
                 <span id="val-state-badge" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-slate-600">
@@ -239,1158 +307,1724 @@
             </div>
           </div>
 
-          <!-- KPI cards (rendered by JS) -->
           <div id="kpi-grid" class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4"></div>
 
-          <!-- Charts -->
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div class="card lg:col-span-2">
-              <div class="mb-5 flex flex-col sm:flex-row items-start justify-between gap-3">
-                <div>
-                  <h3 class="card-title">OEE Trend</h3>
-                  <p id="trend-subtitle" class="card-subtitle">Performance vs. target</p>
-                </div>
-                <!-- Dropdown OEE Trend -->
-                <div class="flex flex-wrap items-center gap-2">
-                  <select id="trendRange" class="input py-1.5 text-sm w-auto cursor-pointer">
-                    <option value="1">1 Day</option>
-                    <option value="7" selected>7 Days</option>
-                    <option value="30">1 Month</option>
-                    <option value="custom">Custom Range</option>
-                  </select>
-                  <div id="trendCustomDates" class="hidden items-center gap-2">
-                    <input type="date" id="trendDateStart" class="input py-1.5 text-sm w-auto">
-                    <span class="text-slate-400">-</span>
-                    <input type="date" id="trendDateEnd" class="input py-1.5 text-sm w-auto">
-                    <button id="btnTrendApply" type="button" class="btn btn-primary py-1.5 px-3 shadow-none">Apply</button>
-                  </div>
-                </div>
-              </div>
-              <div class="mb-3 flex items-center gap-3 text-xs text-slate-500">
-                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>≥ Target</span>
-                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-blue-500"></span>Below Target</span>
-                <span class="flex items-center gap-1.5"><span class="w-4 border-t-2 border-dashed border-red-500"></span>Target</span>
+              <div class="mb-5">
+                <h3 class="card-title">OEE Trend</h3>
+                <p class="card-subtitle">Performance vs. target (Last 7 Days)</p>
               </div>
               <div class="relative h-72"><canvas id="oeeChart"></canvas></div>
             </div>
-
             <div class="card">
               <div class="mb-4">
                 <h3 class="card-title">Time Distribution</h3>
                 <p class="card-subtitle">Today</p>
               </div>
               <div class="relative h-56"><canvas id="timeChart"></canvas></div>
-              <div id="time-legend" class="mt-5 grid grid-cols-2 gap-3"></div>
+              <div id="time-legend" class="mt-5 grid grid-cols-3 gap-2"></div>
             </div>
           </div>
         </section>
 
-        <!-- ===================== OEE PRODUCT ===================== -->
+        <!-- ===================== 3) OEE PRODUCT ===================== -->
         <section id="section-oee-product" class="page-section">
           <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p class="page-eyebrow">Product Analysis</p>
               <h1 class="page-heading">OEE Product Analysis</h1>
-              <p class="page-desc">Detailed breakdown by product / part number</p>
+              <p class="page-desc">Detailed breakdown by product / part number for <span id="lbl-product-machine" class="font-bold text-blue-600 dark:text-sky-400">—</span></p>
             </div>
-            
-            <!-- Dropdown OEE Product -->
-            <div class="flex flex-wrap items-center gap-2">
-              <select id="productRange" class="input w-auto text-sm cursor-pointer">
-                <option value="1" selected>Today (1 Day)</option>
-                <option value="7">Last 7 Days</option>
-                <option value="30">Last 1 Month</option>
-                <option value="custom">Custom Range</option>
-              </select>
-              <div id="productCustomDates" class="hidden items-center gap-2">
-                <input type="date" id="productDateStart" class="input py-1.5 text-sm w-auto">
-                <span class="text-slate-400">-</span>
-                <input type="date" id="productDateEnd" class="input py-1.5 text-sm w-auto">
-                <button id="btnProductApply" type="button" class="btn btn-primary py-1.5 px-3 shadow-none">Apply</button>
-              </div>
-            </div>
+            <select id="productRange" class="input w-auto cursor-pointer text-sm">
+              <option value="1" selected>Today (1 Day)</option>
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 1 Month</option>
+            </select>
           </div>
 
           <div id="product-highlights" class="mb-6 grid gap-4 md:grid-cols-3"></div>
 
           <div class="card overflow-hidden p-0">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-6 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-6 py-4 dark:border-slate-700">
               <div>
                 <h3 class="card-title">Parts Breakdown</h3>
-                <p class="card-subtitle">Sample data — connect to your API to show live values</p>
+                <p class="card-subtitle flex items-center gap-2">Showing data for the selected machine <span id="product-source"></span></p>
               </div>
-              <span id="product-filter-label" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500"></span>
+              <input id="searchInput" type="search" placeholder="Search Job / Part..." class="input w-56 text-sm">
             </div>
             <div class="overflow-x-auto">
               <table class="min-w-full text-sm">
-                <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
+                <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                   <tr>
-                    <th class="px-6 py-3 font-semibold">Job No</th>
-                    <th class="px-6 py-3 font-semibold">Part</th>
-                    <th class="px-6 py-3 text-right font-semibold">Produced</th>
-                    <th class="px-6 py-3 text-right font-semibold">Defect</th>
-                    <th class="w-64 px-6 py-3 font-semibold">OEE</th>
+                    <th class="border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">Job No</th>
+                    <th class="border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">Part</th>
+                    <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">Produced</th>
+                    <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">Defect</th>
+                    <th class="w-64 border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">OEE</th>
                   </tr>
                 </thead>
-                <tbody id="product-tbody" class="divide-y divide-slate-100"></tbody>
+                <tbody id="product-tbody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
               </table>
             </div>
           </div>
         </section>
 
-        <!-- ===================== DAILY SUMMARY ===================== -->
+        <!-- ===================== 4) DAILY SUMMARY ===================== -->
         <section id="section-daily-summary" class="page-section">
           <div class="mb-6">
             <p class="page-eyebrow">Reports</p>
             <h1 class="page-heading">Daily Summary</h1>
-            <p class="page-desc">Production metrics aggregated by day</p>
+            <p class="page-desc">Production metrics aggregated by day for <span id="lbl-summary-machine" class="font-bold text-blue-600 dark:text-sky-400">—</span></p>
           </div>
 
-          <div class="card flex min-h-[400px] flex-col items-center justify-center text-center">
-            <div class="grid h-20 w-20 place-items-center rounded-2xl bg-blue-50 text-3xl text-blue-500">
-              <i class="fa-solid fa-calendar-check"></i>
+          <div class="card flex flex-col p-8">
+            <div class="mb-8 flex flex-wrap items-center gap-4">
+              <input type="date" id="summaryDate" class="input w-auto text-sm">
+              <button id="btnViewLogs" type="button" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass-chart"></i> View Logs</button>
+              <span id="sum-source" class="flex items-center"></span>
             </div>
-            <h2 class="mt-5 text-xl font-semibold text-slate-800">Daily Production Report</h2>
-            <p class="mx-auto mt-2 max-w-md text-sm text-slate-500">Daily overview of parts produced, shift performance and total downtime.</p>
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <input id="summaryDate" type="date" class="input w-auto">
-              <button id="btnToday" type="button" class="btn btn-secondary">Today</button>
-              <button id="btnLoadSummary" type="button" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass-chart"></i> View Report</button>
+
+            <div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div class="rounded-xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-800 dark:bg-blue-900/20">
+                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Total Parts Produced</p>
+                <p id="sum-produced" class="mt-1 text-3xl font-bold text-slate-900 dark:text-white">0</p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-5 dark:border-emerald-800 dark:bg-emerald-900/20">
+                <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Average OEE</p>
+                <p id="sum-oee" class="mt-1 text-3xl font-bold text-slate-900 dark:text-white">0%</p>
+              </div>
+              <div class="rounded-xl border border-red-100 bg-red-50 p-5 dark:border-red-800 dark:bg-red-900/20">
+                <p class="text-sm font-medium text-red-600 dark:text-red-400">Total Downtime</p>
+                <p id="sum-downtime" class="mt-1 text-3xl font-bold text-slate-900 dark:text-white">0 min</p>
+              </div>
+            </div>
+
+            <div class="rounded-xl border-2 border-dashed border-slate-200 py-10 text-center text-slate-400 dark:border-slate-700 dark:text-slate-500">
+              <i class="fa-solid fa-file-invoice mb-3 text-4xl"></i>
+              <p>Select a date to view full shift details, operator logs, and QC notes.</p>
+              <button type="button" onclick="exportReport('pdf')" class="btn btn-secondary mt-4"><i class="fa-solid fa-file-pdf text-red-500"></i> Generate Day/Month/Year PDF Summary</button>
             </div>
           </div>
         </section>
 
-        <!-- ===================== PARETO ===================== -->
+        <!-- ===================== 5) PARETO ===================== -->
         <section id="section-pareto" class="page-section">
           <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p class="page-eyebrow">Downtime Analysis</p>
               <h1 class="page-heading">Pareto Analysis</h1>
-              <p class="page-desc">Identify the main causes of downtime (80/20 rule)</p>
+              <p class="page-desc">Identify the main causes of downtime for <span id="lbl-pareto-machine" class="font-bold text-blue-600 dark:text-sky-400">—</span></p>
             </div>
-            <div class="flex items-center gap-2">
-              <select id="paretoRange" class="input w-auto" aria-label="Date range">
-                <option value="30">Last 30 Days</option>
-                <option value="7">Last 7 Days</option>
-                <option value="1">Today</option>
-              </select>
-              <button id="btnParetoRefresh" type="button" class="btn btn-secondary"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
-            </div>
+            <select id="paretoRange" class="input w-auto cursor-pointer text-sm">
+              <option value="30" selected>Last 30 Days</option>
+              <option value="7">Last 7 Days</option>
+              <option value="1">Today</option>
+            </select>
           </div>
 
           <div id="pareto-summary" class="mb-6 grid gap-4 sm:grid-cols-3"></div>
 
           <div class="card">
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 class="card-title">Top Downtime Reasons</h3>
-                <p class="card-subtitle">Red bars = "vital few" causes that make up ~80% of total downtime</p>
-              </div>
-              <span id="pareto-source" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">—</span>
+            <div class="mb-4">
+              <h3 class="card-title">Top Downtime Reasons</h3>
+              <p class="card-subtitle flex flex-wrap items-center gap-2">Red bars = "vital few" causes that make up ~80% of total downtime <span id="pareto-source"></span></p>
             </div>
             <div class="relative h-80"><canvas id="paretoChart"></canvas></div>
           </div>
         </section>
 
-        <!-- ===================== SETTINGS ===================== -->
+        <!-- ===================== 6) SETTINGS ===================== -->
         <section id="section-settings" class="page-section">
           <div class="mb-6">
             <p class="page-eyebrow">Configuration</p>
             <h1 class="page-heading">System Preferences</h1>
-            <p class="page-desc">Configure dashboard and machine settings</p>
+            <p class="page-desc">Global settings for the dashboard</p>
           </div>
 
-          <form id="settingsForm" class="card max-w-3xl">
-            <div class="mb-6 border-b border-slate-100 pb-4">
-              <h3 class="card-title">General Settings</h3>
+          <form id="settingsForm" class="card max-w-3xl" onsubmit="return false;">
+            <div class="mb-6 border-b border-slate-100 pb-4 dark:border-slate-700">
+              <h3 class="card-title">API Connection</h3>
               <p class="card-subtitle">Settings are saved in this browser (localStorage)</p>
             </div>
-
             <div class="space-y-5">
-              <label class="grid gap-2 sm:grid-cols-[1fr_18rem] sm:items-center">
+              <label class="grid gap-2 sm:grid-cols-[1fr_20rem] sm:items-start">
                 <span>
-                  <span class="block text-sm font-medium text-slate-800">Machine Name</span>
-                  <span class="block text-xs text-slate-500">Display name for the current machine</span>
+                  <span class="block text-sm font-medium text-slate-800 dark:text-white">API Base URLs</span>
+                  <span class="block text-xs text-slate-500 dark:text-slate-400">One URL per line (or comma separated), e.g. http://192.168.1.101:5000</span>
                 </span>
-                <input name="machineName" type="text" required maxlength="60" class="input">
+                <textarea id="apiUrlsInput" rows="6" class="input font-mono text-xs"></textarea>
               </label>
-
-              <label class="grid gap-2 sm:grid-cols-[1fr_18rem] sm:items-center">
+              <label class="grid gap-2 sm:grid-cols-[1fr_20rem] sm:items-center">
                 <span>
-                  <span class="block text-sm font-medium text-slate-800">OEE Target (%)</span>
-                  <span class="block text-xs text-slate-500">Goal for overall equipment effectiveness</span>
+                  <span class="block text-sm font-medium text-slate-800 dark:text-white">Refresh Interval (sec)</span>
+                  <span class="block text-xs text-slate-500 dark:text-slate-400">How often to pull live data (1–60)</span>
                 </span>
-                <input name="oeeTarget" type="number" required min="0" max="100" step="0.1" class="input text-right">
+                <input type="number" id="refreshInterval" min="1" max="60" step="1" class="input text-right">
               </label>
-
-              <label class="grid gap-2 sm:grid-cols-[1fr_18rem] sm:items-center">
+              <label class="grid gap-2 sm:grid-cols-[1fr_20rem] sm:items-center">
                 <span>
-                  <span class="block text-sm font-medium text-slate-800">API Base URL</span>
-                  <span class="block text-xs text-slate-500">e.g. http://192.168.1.10:5000</span>
+                  <span class="block text-sm font-medium text-slate-800 dark:text-white">Target OEE (%)</span>
+                  <span class="block text-xs text-slate-500 dark:text-slate-400">Global target for all machines</span>
                 </span>
-                <input name="apiBase" type="text" required class="input font-mono text-xs">
-              </label>
-
-              <label class="grid gap-2 sm:grid-cols-[1fr_18rem] sm:items-center">
-                <span>
-                  <span class="block text-sm font-medium text-slate-800">Refresh Interval (sec)</span>
-                  <span class="block text-xs text-slate-500">How often to pull live data (1–60)</span>
-                </span>
-                <input name="refreshSec" type="number" required min="1" max="60" step="1" class="input text-right">
+                <input type="number" id="targetOeeInput" min="0" max="100" step="0.1" class="input text-right">
               </label>
             </div>
-
-            <div class="mt-8 flex justify-end gap-3 border-t border-slate-100 pt-5">
-              <button id="btnResetSettings" type="button" class="btn btn-secondary">Reset to Default</button>
-              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+            <div class="mt-8 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-700">
+              <button type="button" onclick="resetSettings()" class="btn btn-secondary">Reset to Default</button>
+              <button type="button" onclick="saveSettings()" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
             </div>
           </form>
         </section>
-      </div>
 
-      <footer class="py-5 text-center text-xs text-slate-400">
-        &copy; <span id="year"></span> OEE Dashboard System. All rights reserved.
-      </footer>
+      </div>
+      <footer class="py-5 text-center text-xs text-slate-400">&copy; <span id="year"></span> Techno Foam Co., Ltd. — OEE Plant System</footer>
     </main>
   </div>
 </div>
 
 <!-- Toast container -->
-<div id="toast-root" class="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
+<div id="toast-root" class="pointer-events-none fixed bottom-6 right-6 z-[110] flex flex-col gap-2"></div>
 
 <script>
 'use strict';
 
 /* =========================================================
- * 1) CONFIG & CONSTANTS
+ * 1) HELPERS
  * ========================================================= */
-const STORAGE_KEY = 'oee-dashboard-settings';
-const REQUEST_TIMEOUT_MS = 5000;
+const $ = (id) => document.getElementById(id);
+const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const round2 = (v) => Math.round(num(v) * 100) / 100;
+const fmt = (n, d = 0) => num(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// วันที่ตามเวลาท้องถิ่น (toISOString() เป็น UTC จะได้วันผิดช่วง 00:00–07:00 ในไทย)
+const todayISO = () => { const n = new Date(); return new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const shortDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
+// สุ่มแบบกำหนด seed — ข้อมูลจำลองจะคงที่ ไม่กระโดดทุกครั้งที่ render
+function seeded(text) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  if (h === 0) h = 1;
+  return () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return (h % 100000) / 100000; };
+}
+
+const TOAST_TYPES = {
+  success: ['fa-circle-check', 'text-emerald-500'],
+  info:    ['fa-circle-info', 'text-blue-500'],
+  warn:    ['fa-triangle-exclamation', 'text-amber-500'],
+  error:   ['fa-circle-xmark', 'text-red-500'],
+};
+function showToast(message, type = 'success') {
+  const [icon, color] = TOAST_TYPES[type] || TOAST_TYPES.success;
+  const el = document.createElement('div');
+  el.className = 'toast-enter pointer-events-auto flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  el.innerHTML = `<i class="fa-solid ${icon} ${color}"></i><span>${escapeHTML(message)}</span>`;
+  $('toast-root').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2800);
+}
+
+function statCard({ label, value, sub = '', icon, tone }) {
+  return `
+  <div class="card flex items-center gap-4 p-5">
+    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl ${tone}"><i class="fa-solid ${icon} text-lg"></i></div>
+    <div class="min-w-0">
+      <p class="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">${escapeHTML(label)}</p>
+      <p class="truncate text-lg font-bold text-slate-900 dark:text-white">${escapeHTML(String(value))}</p>
+      ${sub ? `<p class="text-xs text-slate-500 dark:text-slate-400">${escapeHTML(sub)}</p>` : ''}
+    </div>
+  </div>`;
+}
+
+function sourceBadge(isMock) {
+  return isMock
+    ? '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"><i class="fa-solid fa-flask"></i> Simulated</span>'
+    : '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><i class="fa-solid fa-plug"></i> Live API</span>';
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+const TONE = {
+  emerald: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+  amber:   'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+  red:     'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400',
+  blue:    'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+};
+
+/* =========================================================
+ * 2) CONFIG & CONSTANTS
+ * ========================================================= */
+// ใส่ IP จริงของแต่ละเครื่อง (หรือตั้งค่าผ่านหน้า Preferences ได้)
 const DEFAULT_SETTINGS = Object.freeze({
-  machineName: 'AUTO PUNCHING PH4',
-  oeeTarget: 85,
-  apiBase: 'http://127.0.0.1:5000', // TODO: ใส่ IP และ Port จริงของ API คุณที่นี่
-  refreshSec: 3,
+  apiUrls: [
+    'http://***.***.*.**:****', // PH1
+    'http://***.***.*.**:****', // PH2
+    'http://***.***.*.**:****', // PH3
+    'http://***.***.*.**:****', // PH4
+    'http://***.***.*.**:****', // PH5
+    'http://***.***.*.**:****', // PH6
+    'http://***.***.*.**:****', // PH7
+    'http://***.***.*.**:****', // PH8
+    'http://***.***.*.**:****', // PH9
+    'http://***.***.*.**:****', // PH10
+    'http://***.***.*.**:****', // PH11
+  ],
+  refreshInterval: 3,
+  targetOee: 85,
 });
 
+// Endpoint ของ API (แก้ให้ตรงกับระบบจริงได้)
+const API_PATHS = {
+  live:     '/api/dashboard/live',      // ข้อมูลสด (จำเป็น)
+  products: '/api/dashboard/products',  // ?days=1|7|30  (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
+  pareto:   '/api/dashboard/pareto',    // ?days=1|7|30  (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
+  summary:  '/api/dashboard/summary',   // ?date=YYYY-MM-DD (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
+};
+const FETCH_TIMEOUT_MS = 2500;
+const RANGE_CACHE_MS = 60000;
+
+const SETTINGS_KEY = 'tfc-oee-settings';
+const AUTH_KEY = 'tfc-oee-user';
+
+// ⚠️ บัญชีจำลองสำหรับช่วงพัฒนาเท่านั้น — ระบบจริงต้องตรวจสอบสิทธิ์ที่ฝั่ง Server/API
+const DEMO_USERS = { admin: '1234', user: '1234' };
+
+const ASSET_PATHS = {
+  logo: ['assets/tfc-logo.png'],
+  fontRegular: ['assets/fonts/Sarabun-Regular.ttf', 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf'],
+  fontBold:    ['assets/fonts/Sarabun-Bold.ttf',    'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf'],
+};
+
+const BRAND = {
+  navy: [11, 35, 64],
+  sky: [14, 165, 233],
+  slate: [51, 65, 85],
+  company: 'Techno Foam Co., Ltd.',
+};
+
+const DEMO_MACHINES = ['PH1', 'PH2', 'PH3', 'PH4', 'PH5', 'PH6', 'PH7', 'PH8', 'PH9', 'PH10', 'PH11'];
+const DOWNTIME_REASONS = ['Sensor Error', 'Material Jam', 'Tool Wear', 'Wait Operator', 'Power Dip', 'Mold Change', 'Quality Check'];
+
+function loadSettings() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { s = {}; }
+  const urls = Array.isArray(s.apiUrls) ? s.apiUrls.filter(u => typeof u === 'string' && u.trim()) : [];
+  const ri = parseInt(s.refreshInterval, 10);
+  const tg = parseFloat(s.targetOee);
+  return {
+    apiUrls: urls.length ? urls : [...DEFAULT_SETTINGS.apiUrls],
+    refreshInterval: Number.isFinite(ri) ? clamp(ri, 1, 60) : DEFAULT_SETTINGS.refreshInterval,
+    targetOee: Number.isFinite(tg) ? clamp(tg, 0, 100) : DEFAULT_SETTINGS.targetOee,
+  };
+}
+let settings = loadSettings();
+
 const KPI_DEFS = [
-  { key: 'oee',          label: 'Overall OEE',  icon: 'fa-chart-pie',    color: '#10b981', target: () => state.settings.oeeTarget },
+  { key: 'oee',          label: 'Overall OEE',  icon: 'fa-chart-pie',    color: '#10b981', target: () => settings.targetOee },
   { key: 'availability', label: 'Availability', icon: 'fa-power-off',    color: '#3b82f6', target: () => 90 },
   { key: 'performance',  label: 'Performance',  icon: 'fa-gauge-high',   color: '#f59e0b', target: () => 95 },
   { key: 'quality',      label: 'Quality',      icon: 'fa-check-double', color: '#6366f1', target: () => 99 },
 ];
 
 const STATUS_MAP = {
-  run:     { label: 'RUNNING',     icon: 'fa-play',                 text: 'text-emerald-700', dot: 'bg-emerald-500', pulse: true },
-  down:    { label: 'BREAKDOWN',   icon: 'fa-triangle-exclamation', text: 'text-red-700',     dot: 'bg-red-500' },
-  setup:   { label: 'SETUP',       icon: 'fa-wrench',               text: 'text-teal-700',    dot: 'bg-teal-500' },
-  qc:      { label: 'QC CHECK',    icon: 'fa-magnifying-glass',     text: 'text-amber-700',   dot: 'bg-amber-500' },
-  no_op:   { label: 'NO OPERATOR', icon: 'fa-user-slash',           text: 'text-purple-700',  dot: 'bg-purple-500' },
-  break:   { label: 'BREAK',       icon: 'fa-mug-hot',              text: 'text-slate-700',   dot: 'bg-slate-500' },
-  idle:    { label: 'IDLE',        icon: 'fa-pause',                text: 'text-slate-600',   dot: 'bg-slate-400' },
-  pending: { label: 'WAITING',     icon: 'fa-hourglass-half',       text: 'text-slate-600',   dot: 'bg-slate-400' },
-  offline: { label: 'APP OFFLINE', icon: 'fa-plug-circle-xmark',    text: 'text-red-700',     dot: 'bg-red-500' },
+  run:     { label: 'RUNNING',   icon: 'fa-play',                 text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500', border: 'border-l-emerald-500', pulse: true },
+  down:    { label: 'BREAKDOWN', icon: 'fa-triangle-exclamation', text: 'text-red-700 dark:text-red-300',         dot: 'bg-red-500',     border: 'border-l-red-500' },
+  idle:    { label: 'WAIT/IDLE', icon: 'fa-pause',                text: 'text-slate-600 dark:text-slate-300',     dot: 'bg-slate-400',   border: 'border-l-slate-400' },
+  offline: { label: 'OFFLINE',   icon: 'fa-plug-circle-xmark',    text: 'text-slate-400 dark:text-slate-500',     dot: 'bg-slate-300',   border: 'border-l-slate-300' },
 };
-
-const CONN_STYLES = {
-  connecting: { text: 'Connecting…',         cls: 'bg-slate-100 text-slate-600',     dot: 'bg-slate-400 animate-pulse' },
-  online:     { text: 'API: Connected',      cls: 'bg-emerald-50 text-emerald-700',  dot: 'bg-emerald-500' },
-  offline:    { text: 'API: Offline (Demo)', cls: 'bg-amber-50 text-amber-700',      dot: 'bg-amber-500 animate-pulse' },
-};
+const STATUS_PDF_COLOR = { RUNNING: [5, 150, 105], BREAKDOWN: [220, 38, 38], 'WAIT/IDLE': [100, 116, 139], OFFLINE: [148, 163, 184] };
 
 const TIME_DIST = [
-  { label: 'Run Time',    value: 65, color: '#10b981' },
-  { label: 'Setup',       value: 8,  color: '#14b8a6' },
-  { label: 'QC',          value: 7,  color: '#eab308' },
-  { label: 'Breakdown',   value: 10, color: '#ef4444' },
-  { label: 'No Operator', value: 5,  color: '#a855f7' },
-  { label: 'Idle',        value: 5,  color: '#94a3b8' },
-];
-
-const PARETO_SAMPLE = {
-  labels: ['Tooling Break', 'Material Wait', 'Sensor Error', 'Power Drop', 'Jamming'],
-  downtime: [120, 80, 35, 18, 12],
-};
-
-const SAMPLE_PRODUCTS = [
-  { job: 'JOB-A24-009', part: 'Bracket Assembly L',      produced: 840,   defect: 0.8, oee: 85.2 },
-  { job: 'JOB-A24-007', part: 'Part A - Mounting Plate', produced: 9800,  defect: 0.6, oee: 92.4 },
-  { job: 'JOB-A24-005', part: 'Part B - Hinge Base',     produced: 7600,  defect: 1.9, oee: 81.7 },
-  { job: 'JOB-A24-004', part: 'Part C - Cover Panel',    produced: 5400,  defect: 4.2, oee: 68.3 },
-  { job: 'JOB-A24-002', part: 'Part D - Clip Spring',    produced: 15200, defect: 1.1, oee: 88.9 },
+  { label: 'Run Time',  color: '#10b981' },
+  { label: 'Down',      color: '#ef4444' },
+  { label: 'Idle/Wait', color: '#94a3b8' },
 ];
 
 const SECTION_TITLES = {
-  'dashboard': 'Dashboard',
-  'oee-product': 'OEE Product',
-  'daily-summary': 'Daily Summary',
-  'pareto': 'Pareto Analysis',
-  'settings': 'Preferences',
+  'overview': 'Plant Overview', 'dashboard': 'Machine Details',
+  'oee-product': 'OEE Product', 'daily-summary': 'Daily Summary',
+  'pareto': 'Pareto Analysis', 'settings': 'Preferences',
 };
 
-const RING_C = 2 * Math.PI * 26;
-
 /* =========================================================
- * 2) STATE
+ * 3) STATE
  * ========================================================= */
 const state = {
-  settings: loadSettings(),
+  started: false,
+  activeSection: 'overview',
+  selectedMachine: '',
   pollTimer: null,
-  inFlight: false,
-  isDemo: false,
-  lastData: null,
-  demoProduced: 840,
+  pollGen: 0,
+  everConnected: false,
+  machines: {},
+  machineList: [],
+  urlToName: {},
+  productRange: 1,
+  paretoRange: 30,
+  rangeCache: {},
+  summaryCache: {},
   charts: {},
-  products: SAMPLE_PRODUCTS,
+  assetsPromise: Promise.resolve(),
 };
 
-/* =========================================================
- * 3) HELPERS
- * ========================================================= */
-const $ = (id) => document.getElementById(id);
-const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
-const toNum = (v, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
-const fmt = (n, d = 0) => toNum(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-const maxBy = (arr, fn) => arr.reduce((best, x) => (fn(x) > fn(best) ? x : best));
+const currentMachine = () => state.machines[state.selectedMachine];
+const currentUser = () => sessionStorage.getItem(AUTH_KEY) || 'System';
 
-function escapeHTML(str) {
-  return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function resetConnectionState() {
+  state.machines = {};
+  state.machineList = [];
+  state.urlToName = {};
+  state.everConnected = false;
+  state.rangeCache = {};
+  state.summaryCache = {};
+  state.selectedMachine = '';
 }
 
-function loadSettings() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return { ...DEFAULT_SETTINGS, ...saved };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
+/* =========================================================
+ * 4) LOGIN
+ * ========================================================= */
+function handleLogin(e) {
+  e.preventDefault();
+  const user = $('loginUser').value.trim();
+  const pass = $('loginPass').value;
+  if (Object.prototype.hasOwnProperty.call(DEMO_USERS, user) && DEMO_USERS[user] === pass) {
+    sessionStorage.setItem(AUTH_KEY, user);
+    $('login-error').classList.add('hidden');
+    hideLogin();
+    showToast(`Login successful! Welcome, ${user}.`);
+    startApp();
+  } else {
+    $('login-error').classList.remove('hidden');
+    $('loginPass').value = '';
+    $('loginPass').focus();
   }
 }
 
-function saveSettings(settings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+function hideLogin() {
+  const el = $('login-overlay');
+  el.classList.add('opacity-0');
+  setTimeout(() => el.classList.add('hidden'), 300);
 }
 
-const apiUrl = (path) => `${state.settings.apiBase.replace(/\/+$/, '')}${path}`;
+function logout() {
+  clearTimeout(state.pollTimer);
+  sessionStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
 
-async function fetchJSON(url, timeoutMs = REQUEST_TIMEOUT_MS) {
+/* =========================================================
+ * 5) MOCK DATA (ใช้เมื่อเชื่อม API ไม่ได้)
+ * ========================================================= */
+function createMachine(name, apiUrl = null) {
+  const rnd = seeded(name);
+  return {
+    machineName: name,
+    apiUrl,
+    isMock: !apiUrl,
+    oee: 0,
+    availability: 80 + rnd() * 15,
+    performance: 85 + rnd() * 12,
+    quality: 97 + rnd() * 2.5,
+    jobNo: '-', partName: '-',
+    produced: 0, target: 0,
+    machineState: 'offline',
+    timeDistribution: [300 + rnd() * 100, 20 + rnd() * 40, 30 + rnd() * 60], // นาที: [run, down, idle]
+    trend: Array.from({ length: 6 }, () => 65 + rnd() * 25),             // OEE 6 วันก่อนหน้า
+  };
+}
+
+function mockDataTick() {
+  const yy = String(new Date().getFullYear()).slice(2);
+  state.machineList.forEach(name => {
+    const d = state.machines[name] || (state.machines[name] = createMachine(name));
+    if (d.machineState === 'offline') {
+      const rnd = seeded(`${name}|init`);
+      const r = rnd();
+      d.machineState = r > 0.8 ? 'down' : r > 0.12 ? 'run' : 'idle';
+      d.target = 1000 + Math.round(rnd() * 500);
+      d.produced = Math.round(d.target * (0.2 + rnd() * 0.6));
+      d.jobNo = `JOB-${yy}-${name}-001`;
+      d.partName = `Foam Component ${name}-A`;
+    }
+    if (Math.random() < 0.02) d.machineState = ['run', 'run', 'run', 'idle', 'down'][Math.floor(Math.random() * 5)];
+    if (d.machineState === 'run') d.produced = Math.min(d.produced + Math.floor(Math.random() * 3), d.target);
+
+    const bucket = { run: 0, down: 1, idle: 2 }[d.machineState];
+    if (bucket !== undefined) d.timeDistribution[bucket] += settings.refreshInterval / 60;
+
+    d.availability = clamp(d.availability + (Math.random() - 0.5) * 1.5, 60, 100);
+    d.performance = clamp(d.performance + (Math.random() - 0.5) * 1.5, 70, 100);
+    d.quality = clamp(d.quality + (Math.random() - 0.5) * 0.3, 95, 100);
+    d.oee = (d.availability * d.performance * d.quality) / 10000;
+  });
+}
+
+function mockProducts(name, days) {
+  const rnd = seeded(`${name}|products|${days}`);
+  const yy = String(new Date().getFullYear()).slice(2);
+  const count = days === 1 ? 3 : days === 7 ? 5 : 8;
+  return Array.from({ length: count }, (_, i) => ({
+    job: `JOB-${yy}-${name}-${String(i + 1).padStart(3, '0')}`,
+    part: `Foam Component ${name}-${String.fromCharCode(65 + i)}`,
+    produced: Math.round((800 + rnd() * 4200) * Math.max(1, days / 2)),
+    defect: round2(rnd() * 4),
+    oee: round2(65 + rnd() * 30),
+  }));
+}
+
+function mockPareto(name, days) {
+  const rnd = seeded(`${name}|pareto|${days}`);
+  const weights = [1, 0.65, 0.35, 0.2, 0.12, 0.08, 0.05];
+  return DOWNTIME_REASONS.map((label, i) => ({ label, value: Math.round(25 * days * weights[i] * (0.6 + rnd() * 0.8)) }));
+}
+
+/* =========================================================
+ * 6) API INTEGRATION
+ * ========================================================= */
+async function fetchJSON(url) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }
 }
 
-function animateValue(el, to, decimals = 1, duration = 700) {
-  if (!el) return;
-  cancelAnimationFrame(el._raf);
-  const from = el._current ?? 0;
-  const start = performance.now();
-  const tick = (now) => {
-    const p = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - p, 3);
-    el._current = from + (to - from) * eased;
-    el.textContent = fmt(el._current, decimals);
-    if (p < 1) el._raf = requestAnimationFrame(tick);
-  };
-  el._raf = requestAnimationFrame(tick);
+function applyApiData(name, url, a) {
+  const d = state.machines[name] || (state.machines[name] = createMachine(name, url));
+  d.apiUrl = url;
+  d.isMock = false;
+  d.jobNo = a.job_no || '-';
+  d.partName = a.part_name || '-';
+  d.produced = num(a.produced);
+  d.target = num(a.target_qty);
+  d.oee = num(a.oee);
+  d.availability = num(a.availability);
+  d.performance = num(a.performance);
+  d.quality = num(a.quality);
+  // ฟิลด์เสริม (ถ้า API ส่งมา)
+  if (Array.isArray(a.time_distribution) && a.time_distribution.length === 3) d.timeDistribution = a.time_distribution.map(num);
+  if (Array.isArray(a.oee_trend) && a.oee_trend.length) d.trend = a.oee_trend.map(num).slice(-6);
+
+  const offline = a.is_online === false || a.is_online === 0;
+  d.machineState = offline ? 'offline'
+    : a.machine_state === 'prod' ? 'run'
+    : a.machine_state === 'downtime' ? 'down'
+    : 'idle';
 }
 
-function showToast(message, type = 'success') {
-  const styles = {
-    success: { icon: 'fa-circle-check', cls: 'text-emerald-500' },
-    error:   { icon: 'fa-circle-xmark', cls: 'text-red-500' },
-    info:    { icon: 'fa-circle-info',  cls: 'text-blue-500' },
-  }[type] || { icon: 'fa-circle-info', cls: 'text-blue-500' };
-
-  const el = document.createElement('div');
-  el.className = 'toast-enter pointer-events-auto flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-lg';
-  el.innerHTML = `<i class="fa-solid ${styles.icon} ${styles.cls}"></i><span></span>`;
-  el.querySelector('span').textContent = message;
-  $('toast-root').appendChild(el);
-
-  setTimeout(() => {
-    el.style.transition = 'opacity .3s';
-    el.style.opacity = '0';
-    setTimeout(() => el.remove(), 300);
-  }, 2800);
-}
-
-const statCard = ({ label, value, sub = '', icon, tone }) => `
-  <div class="card flex items-center gap-4 p-5">
-    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl ${tone}"><i class="fa-solid ${icon} text-lg"></i></div>
-    <div class="min-w-0">
-      <p class="text-xs font-medium uppercase tracking-wider text-slate-500">${escapeHTML(label)}</p>
-      <p class="truncate text-lg font-bold text-slate-900">${escapeHTML(value)}</p>
-      ${sub ? `<p class="text-xs text-slate-500">${escapeHTML(sub)}</p>` : ''}
-    </div>
-  </div>`;
-
-/* =========================================================
- * 4) NAVIGATION & SIDEBAR
- * ========================================================= */
-function openSidebar() {
-  $('sidebar').classList.remove('-translate-x-full');
-  $('sidebarOverlay').classList.remove('hidden');
-}
-
-function closeSidebar() {
-  $('sidebar').classList.add('-translate-x-full');
-  $('sidebarOverlay').classList.add('hidden');
-}
-
-function showSection(name, { updateHash = true } = {}) {
-  if (!SECTION_TITLES[name]) name = 'dashboard';
-
-  document.querySelectorAll('.page-section').forEach((s) => {
-    s.classList.toggle('is-active', s.id === `section-${name}`);
-  });
-
-  document.querySelectorAll('.nav-item').forEach((btn) => {
-    const active = btn.dataset.section === name;
-    btn.classList.toggle('is-active', active);
-    if (active) btn.setAttribute('aria-current', 'page');
-    else btn.removeAttribute('aria-current');
-  });
-
-  $('page-title').textContent = SECTION_TITLES[name];
-  $('main').scrollTo({ top: 0 });
-  if (updateHash) history.replaceState(null, '', `#${name}`);
-
-  if (name === 'pareto') fetchAndRenderPareto();
-  if (name === 'dashboard') {
-    state.charts.trend?.resize();
-    state.charts.time?.resize();
-  }
-  if (window.matchMedia('(max-width: 767px)').matches) closeSidebar();
-}
-
-/* =========================================================
- * 5) LIVE DATA (polling)
- * ========================================================= */
-function setConnection(status) {
-  const s = CONN_STYLES[status];
-  const el = $('conn-status');
-  el.className = `inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${s.cls}`;
-  el.title = s.text;
-  el.innerHTML = `<span class="h-2 w-2 rounded-full ${s.dot}"></span><span class="hidden sm:inline">${s.text}</span>`;
-
-  state.isDemo = status === 'offline';
-  $('demo-banner').classList.toggle('hidden', !state.isDemo);
-  $('demo-banner').classList.toggle('flex', state.isDemo);
-}
-
-function normalizeLive(raw) {
-  return {
-    oee: toNum(raw.oee),
-    availability: toNum(raw.availability),
-    performance: toNum(raw.performance),
-    quality: toNum(raw.quality),
-    jobNo: raw.job_no || 'NO-JOB',
-    partName: raw.part_name ? `${raw.part_name}${raw.part_no ? ` (${raw.part_no})` : ''}` : 'No part selected',
-    machineName: raw.machine_name || state.settings.machineName,
-    produced: toNum(raw.part_produced),
-    target: toNum(raw.target_qty),
-    progressPct: raw.progress_pct == null ? null : toNum(raw.progress_pct),
-    progressLabel: raw.progress_label || '',
-    machineState: String(raw.machine_state || 'idle').toLowerCase(),
-    stateReason: raw.state_reason || '',
-    timeDistribution: Array.isArray(raw.time_distribution) ? raw.time_distribution.map((v) => toNum(v)) : null,
-  };
-}
-
-function getDemoData() {
-  state.demoProduced = Math.min(state.demoProduced + Math.floor(Math.random() * 4), 1200);
-  const jitter = (base, r = 0.6) => clamp(base + (Math.random() - 0.5) * r * 2, 0, 100);
-  const availability = jitter(90.5);
-  const performance = jitter(95.1);
-  const quality = jitter(99.0, 0.3);
-  return {
-    oee: (availability * performance * quality) / 10000,
-    availability, performance, quality,
-    jobNo: 'JOB-A24-009',
-    partName: 'Bracket Assembly L',
-    machineName: state.settings.machineName,
-    produced: state.demoProduced,
-    target: 1200,
-    machineState: 'run',
-    timeDistribution: null,
-  };
-}
-
-function updateKpi(def, value) {
-  const v = clamp(toNum(value), 0, 100);
-  const target = def.target();
-  const diff = v - target;
-
-  animateValue($(`kpi-${def.key}-value`), v, 1);
-  $(`kpi-${def.key}-ring`).style.strokeDashoffset = `${RING_C * (1 - v / 100)}px`;
-  $(`kpi-${def.key}-target`).textContent = `${fmt(target, 1)}%`;
-
-  let cls = 'bg-red-50 text-red-700', icon = 'fa-arrow-down';
-  if (diff >= 0) { cls = 'bg-emerald-50 text-emerald-700'; icon = 'fa-arrow-up'; }
-  else if (diff >= -5) { cls = 'bg-amber-50 text-amber-700'; }
-
-  const chip = $(`kpi-${def.key}-chip`);
-  chip.className = `inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${cls}`;
-  chip.innerHTML = `<i class="fa-solid ${icon} text-[10px]"></i>${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pt`;
-}
-
-function updateStatusBadge(rawState, reason = '') {
-  const key = String(rawState || 'idle').toLowerCase();
-  const s = STATUS_MAP[key] || { ...STATUS_MAP.idle, label: key.toUpperCase() };
-  const badge = $('val-state-badge');
-
-  badge.className = `inline-flex max-w-full items-center gap-2 rounded-full bg-white px-4 py-1.5 text-sm font-bold shadow-sm ${s.text} ${s.pulse ? 'live-pulse' : ''}`;
-  badge.innerHTML = `<span class="h-2.5 w-2.5 shrink-0 rounded-full ${s.dot}"></span><i class="fa-solid ${s.icon} text-xs"></i><span class="truncate"></span>`;
-  badge.lastElementChild.textContent = reason ? `${s.label}: ${reason}` : s.label;
-  badge.title = reason || s.label;
-}
-
-function renderLive(d) {
-  state.lastData = { ...d, updatedAt: new Date() };
-
-  $('dash-machine-name').textContent = d.machineName;
-  KPI_DEFS.forEach((k) => updateKpi(k, d[k.key]));
-
-  $('val-job-no').textContent = d.jobNo;
-  $('val-part-name').textContent = d.progressLabel ? `${d.partName} · ${d.progressLabel}` : d.partName;
-
-  const pct = d.progressPct != null
-    ? clamp(d.progressPct, 0, 100)
-    : (d.target > 0 ? clamp((d.produced / d.target) * 100, 0, 100) : 0);
-
-  animateValue($('val-produced'), d.produced, 0);$('val-target').textContent = fmt(d.target);
-  $('val-progress-pct').textContent = pct.toFixed(1);$('val-remaining').textContent = fmt(Math.max(d.target - d.produced, 0));
-
-  const bar = $('progress-bar');
-  bar.style.width = `${pct}%`;
-  bar.classList.toggle('bg-white', pct < 100);
-  bar.classList.toggle('bg-emerald-300', pct >= 100);
-
-  updateStatusBadge(d.machineState, d.stateReason);
-  if (d.timeDistribution?.length === TIME_DIST.length) updateTimeChart(d.timeDistribution);
-
-  $('last-updated').textContent = state.lastData.updatedAt.toLocaleTimeString('en-GB');
-}
-
-async function pollLive() {
-  if (state.inFlight) return;
-  state.inFlight = true;
+async function pollData() {
+  const gen = ++state.pollGen;
   clearTimeout(state.pollTimer);
 
-  try {
-    const raw = await fetchJSON(apiUrl('/api/dashboard/live'));
-    if (raw?.status !== 'success') throw new Error('Unexpected API response');
-    setConnection('online');
-    renderLive(normalizeLive(raw));
-  } catch (err) {
-    if (!state.isDemo) console.warn('[OEE] Live API unavailable → demo mode:', err.message);
-    setConnection('offline');
-    renderLive(getDemoData());
-  } finally {
-    state.inFlight = false;
-    scheduleNextPoll();
+  const urls = [...settings.apiUrls];
+  const results = await Promise.all(urls.map(async (url) => {
+    const json = await fetchJSON(`${url}${API_PATHS.live}`);
+    return { url, data: json ? (json.data ?? json) : null };
+  }));
+  if (gen !== state.pollGen) return; // มีรอบใหม่กว่าแล้ว — ทิ้งผลลัพธ์เก่า
+
+  const onlineCount = results.filter(r => r.data && r.data.machine_name).length;
+
+  if (onlineCount > 0) {
+    if (!state.everConnected) { state.machines = {}; state.rangeCache = {}; state.summaryCache = {}; }
+    state.everConnected = true;
+    const list = [];
+    results.forEach(({ url, data }) => {
+      if (data && data.machine_name) {
+        const name = String(data.machine_name);
+        state.urlToName[url] = name;
+        if (!list.includes(name)) list.push(name);
+        applyApiData(name, url, data);
+      } else if (state.urlToName[url]) {
+        const name = state.urlToName[url];
+        if (!list.includes(name)) list.push(name);
+        const d = state.machines[name] || (state.machines[name] = createMachine(name, url));
+        d.machineState = 'offline';
+      }
+    });
+    state.machineList = list;
+    setConnStatus(onlineCount === urls.length ? 'online' : 'partial', `${onlineCount}/${urls.length}`);
+  } else if (state.everConnected) {
+    // เคยเชื่อมได้ แต่ตอนนี้หลุดทั้งหมด — คงข้อมูลเดิมไว้ และแสดงสถานะ Offline
+    state.machineList.forEach(n => { if (state.machines[n]) state.machines[n].machineState = 'offline'; });
+    setConnStatus('offline');
+  } else {
+    if (!state.machineList.length) state.machineList = [...DEMO_MACHINES];
+    mockDataTick();
+    setConnStatus('demo');
   }
+
+  updateMachineDropdown();
+  renderActiveSection();
+  state.pollTimer = setTimeout(pollData, settings.refreshInterval * 1000);
 }
 
-function scheduleNextPoll() {
-  clearTimeout(state.pollTimer);
-  if (document.hidden) return;
-  state.pollTimer = setTimeout(pollLive, clamp(toNum(state.settings.refreshSec, 3), 1, 60) * 1000);
+async function manualRefresh(btn) {
+  const icon = btn?.querySelector('i');
+  icon?.classList.add('fa-spin');
+  await pollData();
+  icon?.classList.remove('fa-spin');
 }
 
-/* =========================================================
- * 6) CHARTS
- * ========================================================= */
-const centerTextPlugin = {
-  id: 'centerText',
-  afterDraw(chart) {
-    const { ctx, chartArea } = chart;
-    if (!chartArea) return;
-    const data = chart.data.datasets[0].data;
-    const total = data.reduce((a, b) => a + b, 0);
-    const pct = total ? (data[0] / total) * 100 : 0;
-    const x = (chartArea.left + chartArea.right) / 2;
-    const y = (chartArea.top + chartArea.bottom) / 2;
-
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '700 26px Inter, sans-serif';
-    ctx.fillText(`${pct.toFixed(0)}%`, x, y - 8);
-    ctx.fillStyle = '#64748b';
-    ctx.font = '500 12px Inter, sans-serif';
-    ctx.fillText('Run Time', x, y + 16);
-    ctx.restore();
-  },
+const CONN_STYLES = {
+  online:  ['bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', 'bg-emerald-500', 'API: Connected'],
+  partial: ['bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', 'bg-amber-500', 'API: Partial'],
+  offline: ['bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400', 'bg-red-500', 'API: Offline'],
+  demo:    ['bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', 'bg-amber-500', 'Demo Mode'],
 };
 
-function initCharts() {
-  if (typeof Chart === 'undefined') {
-    console.error('[OEE] Chart.js failed to load');
-    return;
-  }
-  Chart.defaults.font.family = "'Inter', 'Noto Sans Thai', sans-serif";
-  Chart.defaults.color = '#64748b';
-  Chart.defaults.plugins.tooltip.backgroundColor = '#0f172a';
-  Chart.defaults.plugins.tooltip.padding = 10;
-  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+function setConnStatus(mode, extra = '') {
+  const [cls, dot, text] = CONN_STYLES[mode];
+  const el = $('conn-status');
+  el.className = `inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${cls}`;
+  el.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}"></span><span class="hidden sm:inline">${text}${extra ? ` (${extra})` : ''}</span>`;
 
-  initTrendChart();
-  initTimeChart();
+  const banner = $('conn-banner');
+  if (mode === 'demo') {
+    banner.className = 'mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200';
+    banner.innerHTML = '<i class="fa-solid fa-flask"></i><p><b>Demo mode:</b> Cannot reach any machine API — showing simulated data. Check the API URLs in Preferences.</p>';
+  } else if (mode === 'offline') {
+    banner.className = 'mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200';
+    banner.innerHTML = '<i class="fa-solid fa-plug-circle-xmark"></i><p><b>Connection lost:</b> All machine APIs are unreachable. Showing last known data — retrying automatically.</p>';
+  } else {
+    banner.className = 'mb-6 hidden';
+    banner.innerHTML = '';
+  }
 }
 
-function initTrendChart() {
+/* ---------- ข้อมูลตามช่วงเวลา (Products / Pareto) ---------- */
+function normalizeRange(kind, raw) {
+  if (kind === 'products') {
+    if (!Array.isArray(raw)) return null;
+    return raw.map(p => ({
+      job: p.job_no ?? p.job ?? '-',
+      part: p.part_name ?? p.part ?? '-',
+      produced: num(p.produced),
+      defect: num(p.defect_rate ?? p.defect),
+      oee: num(p.oee),
+    }));
+  }
+  if (Array.isArray(raw)) return raw.map(r => ({ label: r.reason ?? r.label ?? '-', value: num(r.minutes ?? r.downtime ?? r.value) }));
+  if (raw && Array.isArray(raw.labels)) return raw.labels.map((label, i) => ({ label, value: num(raw.downtime?.[i]) }));
+  return null;
+}
+
+async function loadRangeData(d, kind, days, key) {
+  const prev = state.rangeCache[key] || {};
+  state.rangeCache[key] = { ...prev, loading: true };
+  const json = await fetchJSON(`${d.apiUrl}${API_PATHS[kind]}?days=${days}`);
+  const data = json ? normalizeRange(kind, json.data ?? json) : null;
+  state.rangeCache[key] = { data: data ?? prev.data ?? null, at: Date.now(), loading: false };
+  if (data) renderActiveSection();
+}
+
+function getRangeData(d, kind, days) {
+  const key = `${d.machineName}|${kind}|${days}`;
+  const c = state.rangeCache[key];
+  const fresh = c && c.at && (Date.now() - c.at < RANGE_CACHE_MS);
+  if (d.apiUrl && !fresh && !c?.loading) loadRangeData(d, kind, days, key);
+  if (c?.data) return { rows: c.data, mock: false };
+  return { rows: kind === 'products' ? mockProducts(d.machineName, days) : mockPareto(d.machineName, days), mock: true };
+}
+
+function analyzePareto(list) {
+  const rows = list.map(r => ({ ...r })).sort((a, b) => b.value - a.value);
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  let running = 0;
+  rows.forEach(r => {
+    running += r.value;
+    r.share = total ? (r.value / total) * 100 : 0;
+    r.cumulative = total ? (running / total) * 100 : 0;
+  });
+  const idx = rows.findIndex(r => r.cumulative >= 80);
+  return { rows, total, vitalCount: idx === -1 ? rows.length : idx + 1 };
+}
+
+function aggregatePareto(days) {
+  const map = new Map();
+  state.machineList.forEach(n => {
+    const d = state.machines[n];
+    if (!d) return;
+    getRangeData(d, 'pareto', days).rows.forEach(r => map.set(r.label, (map.get(r.label) || 0) + r.value));
+  });
+  return [...map].map(([label, value]) => ({ label, value }));
+}
+
+/* ---------- Daily summary ---------- */
+function getDailySummary(d, date) {
+  const key = `${d.machineName}|${date}`;
+  if (state.summaryCache[key]) return { ...state.summaryCache[key], mock: false };
+  if (date === todayISO()) return { produced: d.produced, oee: d.oee, downtime: d.timeDistribution[1], mock: d.isMock };
+  const rnd = seeded(key);
+  return { produced: Math.round(3000 + rnd() * 6000), oee: 65 + rnd() * 25, downtime: Math.round(20 + rnd() * 120), mock: true };
+}
+
+async function loadDailySummary() {
+  const d = currentMachine();
+  if (!d) return;
+  const date = $('summaryDate').value;
+  if (!date) { showToast('Please select a date', 'warn'); return; }
+  if (date > todayISO()) { showToast('Cannot select a future date', 'warn'); return; }
+
+  const btn = $('btnViewLogs');
+  btn.disabled = true;
+  if (d.apiUrl) {
+    const json = await fetchJSON(`${d.apiUrl}${API_PATHS.summary}?date=${date}`);
+    const r = json ? (json.data ?? json) : null;
+    if (r && r.produced !== undefined) {
+      state.summaryCache[`${d.machineName}|${date}`] = { produced: num(r.produced), oee: num(r.oee), downtime: num(r.downtime_min ?? r.downtime) };
+    }
+  }
+  btn.disabled = false;
+  renderDailySummary(d);
+  showToast(`Loaded summary for ${d.machineName} on ${date}`, 'info');
+}
+
+/* =========================================================
+ * 7) SETTINGS
+ * ========================================================= */
+function fillSettingsForm() {
+  $('apiUrlsInput').value = settings.apiUrls.join('\n');
+  $('refreshInterval').value = settings.refreshInterval;
+  $('targetOeeInput').value = settings.targetOee;
+}
+
+function saveSettings() {
+  const urls = $('apiUrlsInput').value.split(/[\s,]+/).map(s => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  const invalid = urls.find(u => !/^https?:\/\/\S+$/i.test(u));
+  if (!urls.length || invalid) { showToast(`Invalid URL: ${invalid || '(empty)'}`, 'error'); return; }
+
+  const ri = parseInt($('refreshInterval').value, 10);
+  if (!(ri >= 1 && ri <= 60)) { showToast('Refresh interval must be 1–60 seconds', 'error'); return; }
+
+  const tg = parseFloat($('targetOeeInput').value);
+  if (!(tg >= 0 && tg <= 100)) { showToast('Target OEE must be 0–100', 'error'); return; }
+
+  const urlsChanged = urls.join('|') !== settings.apiUrls.join('|');
+  settings = { apiUrls: urls, refreshInterval: ri, targetOee: tg };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  fillSettingsForm();
+
+  if (urlsChanged) resetConnectionState();
+  showToast(urlsChanged ? 'Settings saved! Reconnecting...' : 'Settings saved!');
+  pollData();
+}
+
+function resetSettings() {
+  if (!confirm('Reset all settings to default?')) return;
+  localStorage.removeItem(SETTINGS_KEY);
+  settings = loadSettings();
+  fillSettingsForm();
+  resetConnectionState();
+  showToast('Settings reset to default', 'info');
+  pollData();
+}
+
+/* =========================================================
+ * 8) EXPORT (CSV / EXCEL / PDF)
+ * ========================================================= */
+function buildExportRows() {
+  return state.machineList.map(n => state.machines[n]).filter(Boolean).map(d => ({
+    'Machine': d.machineName,
+    'Status': (STATUS_MAP[d.machineState] || STATUS_MAP.offline).label,
+    'Job No': d.jobNo,
+    'Part Name': d.partName,
+    'Produced': num(d.produced),
+    'Target': num(d.target),
+    'OEE (%)': round2(d.oee),
+    'Availability (%)': round2(d.availability),
+    'Performance (%)': round2(d.performance),
+    'Quality (%)': round2(d.quality),
+  }));
+}
+
+async function exportReport(type) {
+  const rows = buildExportRows();
+  if (!rows.length) { showToast('No data to export yet', 'warn'); return; }
+  try {
+    if (type === 'csv') exportCSV(rows);
+    else if (type === 'excel') exportExcel(rows);
+    else if (type === 'pdf') await generatePDF(rows);
+  } catch (err) {
+    console.error(err);
+    showToast(`Export failed: ${err.message}`, 'error');
+  }
+}
+
+function exportCSV(rows) {
+  const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(rows));
+  // ใส่ BOM เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
+  downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }), `TFC_OEE_Report_${todayISO()}.csv`);
+  showToast('Exported CSV successfully!');
+}
+
+function exportExcel(rows) {
+  const wb = XLSX.utils.book_new();
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'OEE Report');
+
+  const { rows: pRows } = analyzePareto(aggregatePareto(state.paretoRange));
+  const ws2 = XLSX.utils.json_to_sheet(pRows.map((r, i) => ({
+    'Rank': i + 1,
+    'Downtime Cause': r.label,
+    'Downtime (min)': r.value,
+    'Share (%)': round2(r.share),
+    'Cumulative (%)': round2(r.cumulative),
+  })));
+  ws2['!cols'] = [{ wch: 8 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(wb, ws2, `Pareto ${state.paretoRange}d`);
+
+  XLSX.writeFile(wb, `TFC_OEE_Report_${todayISO()}.xlsx`);
+  showToast('Exported Excel successfully!');
+}
+
+/* ---------- PDF assets (โลโก้ + ฟอนต์ไทย) ---------- */
+const ASSETS = { logo: null, fontRegular: null, fontBold: null };
+
+function bufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+async function fetchBase64(urls, isValid) {
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const b64 = bufferToBase64(await res.arrayBuffer());
+      if (isValid(b64)) return b64;
+    } catch { /* ลอง URL ถัดไป */ }
+  }
+  return null;
+}
+
+async function preloadPdfAssets() {
+  const isImage = (b) => b.startsWith('iVBOR') || b.startsWith('/9j/');
+  const isFont = (b) => b.startsWith('AAEAAA') || b.startsWith('T1RUTw');
+  const [logo, reg, bold] = await Promise.all([
+    fetchBase64(ASSET_PATHS.logo, isImage),
+    fetchBase64(ASSET_PATHS.fontRegular, isFont),
+    fetchBase64(ASSET_PATHS.fontBold, isFont),
+  ]);
+  if (logo) {
+    const format = logo.startsWith('/9j/') ? 'JPEG' : 'PNG';
+    ASSETS.logo = { data: `data:image/${format.toLowerCase()};base64,${logo}`, format };
+  }
+  ASSETS.fontRegular = reg;
+  ASSETS.fontBold = bold;
+  if (!logo) console.warn('[PDF] Logo not found — header will use text instead.');
+  if (!reg || !bold) console.warn('[PDF] Thai font not found — PDF will use English labels only.');
+}
+
+
+const PDF_CHART_SIZE = { w: 800, h: 360 }; // px (CSS) — วาดจริงที่ ×2.5 = 2000×900 px
+
+
+// ตัดชื่อสาเหตุยาว ๆ เป็นหลายบรรทัดใต้แกน X
+
+function wrapLabel(text, max = 14) {
+
+  const words = String(text).split(' ');
+
+  const lines = [];
+
+  let line = '';
+
+  words.forEach(w => {
+
+    const next = (line + ' ' + w).trim();
+
+    if (next.length > max && line) { lines.push(line); line = w; }
+
+    else line = next;
+
+  });
+
+  if (line) lines.push(line);
+
+  return lines.length > 1 ? lines : (lines[0] || '');
+
+}
+
+
+// ระบายพื้นขาว (canvas ปกติโปร่งใส)
+
+const pdfWhiteBackground = {
+
+  id: 'pdfWhiteBg',
+
+  beforeDraw(chart) {
+
+    const { ctx, width, height } = chart;
+
+    ctx.save();
+
+    ctx.fillStyle = '#ffffff';
+
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
+
+  },
+
+};
+
+
+// เขียนตัวเลขบนแท่ง และ % บนเส้นสะสม
+
+const pdfParetoLabels = {
+
+  id: 'pdfParetoLabels',
+
+  afterDatasetsDraw(chart) {
+
+    const { ctx } = chart;
+
+    const F = 'Inter, "Noto Sans Thai", sans-serif';
+
+    const vital = chart.$vitalCount ?? 0;
+
+    ctx.save();
+
+    ctx.textAlign = 'center';
+
+
+    // ตัวเลขนาทีบนแท่ง
+
+    const bars = chart.getDatasetMeta(2).data;
+
+    const values = chart.data.datasets[2].data;
+
+    ctx.font = `600 11px ${F}`;
+
+    bars.forEach((bar, i) => {
+
+      const inside = (bar.base - bar.y) > 22;
+
+      ctx.fillStyle = inside && i < vital ? '#ffffff' : '#334155';
+
+      ctx.textBaseline = inside ? 'top' : 'bottom';
+
+      ctx.fillText(fmt(values[i]), bar.x, inside ? bar.y + 5 : bar.y - 3);
+
+    });
+
+
+    // % สะสมบนเส้น (มีขอบขาวให้อ่านง่ายแม้ทับแท่ง)
+
+    const pts = chart.getDatasetMeta(0).data;
+
+    const cum = chart.data.datasets[0].data;
+
+    ctx.font = `700 10.5px ${F}`;
+
+    ctx.textBaseline = 'bottom';
+
+    ctx.lineWidth = 3;
+
+    ctx.strokeStyle = '#ffffff';
+
+    ctx.fillStyle = '#0b2340';
+
+    pts.forEach((p, i) => {
+
+      const t = `${num(cum[i]).toFixed(0)}%`;
+
+      ctx.strokeText(t, p.x, p.y - 7);
+
+      ctx.fillText(t, p.x, p.y - 7);
+
+    });
+
+    ctx.restore();
+
+  },
+
+};
+
+
+async function buildParetoChartImage(pareto) {
+
+  if (!window.Chart || !pareto.rows.length) return null;
+
+  try { await document.fonts?.ready; } catch { /* ใช้ฟอนต์สำรอง */ }
+
+
+  const { w: W, h: H } = PDF_CHART_SIZE;
+
+  const canvas = document.createElement('canvas');
+
+  canvas.width = W;
+
+  canvas.height = H;
+
+  canvas.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:${H}px;pointer-events:none;`;
+
+  document.body.appendChild(canvas);
+
+
+  const FAMILY = 'Inter, "Noto Sans Thai", sans-serif';
+
+  const TXT = '#334155', GRID = '#e2e8f0', NAVY = '#0b2340';
+
+  const { rows, vitalCount } = pareto;
+
+  let chart;
+
+
+  try {
+
+    chart = new Chart(canvas, {
+
+      type: 'bar',
+
+      data: {
+
+        labels: rows.map(r => wrapLabel(r.label)),
+
+        datasets: [
+
+          { type: 'line', label: 'Cumulative %', yAxisID: 'y1', data: rows.map(r => round2(r.cumulative)),
+
+            borderColor: NAVY, backgroundColor: NAVY, borderWidth: 2.5,
+
+            pointRadius: 4, pointBackgroundColor: '#ffffff', pointBorderWidth: 2, order: 1 },
+
+          { type: 'line', label: '80% Line', yAxisID: 'y1', data: rows.map(() => 80),
+
+            borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, order: 0 },
+
+          { type: 'bar', label: 'Downtime (min)', yAxisID: 'y', data: rows.map(r => r.value),
+
+            backgroundColor: rows.map((_, i) => (i < vitalCount ? '#ef4444' : '#cbd5e1')),
+
+            borderRadius: 4, maxBarThickness: 70, order: 2 },
+
+        ],
+
+      },
+
+      options: {
+
+        responsive: false,
+
+        animation: false,          // วาดเสร็จทันที ไม่ต้องรอ animation
+
+        devicePixelRatio: 2.5,     // ความคมชัดสำหรับพิมพ์
+
+        events: [],
+
+        layout: { padding: { top: 24, right: 8, left: 4, bottom: 0 } },
+
+        plugins: {
+
+          legend: { position: 'bottom', labels: { color: TXT, boxWidth: 12, usePointStyle: true, font: { family: FAMILY, size: 12 } } },
+
+          tooltip: { enabled: false },
+
+        },
+
+        scales: {
+
+          x:  { grid: { display: false }, border: { color: GRID },
+
+                ticks: { color: TXT, autoSkip: false, maxRotation: 30, font: { family: FAMILY, size: 11 } } },
+
+          y:  { beginAtZero: true, grace: '8%', grid: { color: GRID }, border: { display: false },
+
+                ticks: { color: TXT, font: { family: FAMILY, size: 11 } },
+
+                title: { display: true, text: 'Downtime (min)', color: TXT, font: { family: FAMILY, size: 12, weight: '600' } } },
+
+          y1: { min: 0, max: 100, position: 'right', grid: { display: false }, border: { display: false },
+
+                ticks: { color: TXT, stepSize: 20, callback: (v) => `${v}%`, font: { family: FAMILY, size: 11 } } },
+
+        },
+
+      },
+
+      plugins: [pdfWhiteBackground, pdfParetoLabels],
+
+    });
+
+    chart.$vitalCount = vitalCount;
+
+    chart.draw();                              // วาดใหม่หลังกำหนด vitalCount
+
+    return chart.toBase64Image('image/png', 1);
+
+  } catch (e) {
+
+    console.warn('[PDF] Pareto chart render failed', e);
+
+    return null;
+
+  } finally {
+
+    chart?.destroy();
+
+    canvas.remove();
+
+  }
+
+}
+
+async function generatePDF(rows) {
+  if (!window.jspdf) { showToast('PDF library not loaded', 'error'); return; }
+  showToast('Generating PDF...', 'info');
+  await state.assetsPromise;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const now = new Date();
+  const target = settings.targetOee;
+
+  // --- ฟอนต์ไทย ---
+  let FONT = 'helvetica';
+  if (ASSETS.fontRegular && ASSETS.fontBold) {
+    try {
+      doc.addFileToVFS('Sarabun-Regular.ttf', ASSETS.fontRegular);
+      doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+      doc.addFileToVFS('Sarabun-Bold.ttf', ASSETS.fontBold);
+      doc.addFont('Sarabun-Bold.ttf', 'Sarabun', 'bold');
+      FONT = 'Sarabun';
+    } catch (e) { console.warn('[PDF] Font register failed', e); }
+  }
+  const thai = FONT === 'Sarabun';
+  const L = (en, th) => (thai ? `${en} (${th})` : en);
+  const locale = thai ? 'th-TH' : 'en-GB';
+
+  // --- Header ---
+  doc.setFillColor(...BRAND.navy);
+  doc.rect(0, 0, 210, 40, 'F');
+
+  let logoDrawn = false;
+  if (ASSETS.logo) {
+    try { doc.addImage(ASSETS.logo.data, ASSETS.logo.format, 10, 9, 62, 22); logoDrawn = true; } catch (e) { console.warn(e); }
+  }
+  if (!logoDrawn) {
+    doc.setFont(FONT, 'bold'); doc.setFontSize(26); doc.setTextColor(125, 211, 252);
+    doc.text('TFC', 14, 22);
+    doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225);
+    doc.text(BRAND.company, 14, 29);
+  }
+
+  doc.setFont(FONT, 'bold'); doc.setFontSize(16); doc.setTextColor(255, 255, 255);
+  doc.text('OEE Executive Summary Report', 196, 16, { align: 'right' });
+  doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225);
+  doc.text(`${L('Generated', 'วันที่ออกรายงาน')}: ${now.toLocaleString(locale)}`, 196, 24, { align: 'right' });
+  doc.text(`${L('Generated By', 'ผู้ออกรายงาน')}: ${currentUser()}`, 196, 29, { align: 'right' });
+  doc.text(`Source: ${state.everConnected ? 'Live API' : 'Demo / Simulated data'}`, 196, 34, { align: 'right' });
+
+  doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.8);
+  doc.line(0, 40, 210, 40);
+
+  // --- คำนวณตัวชี้วัด ---
+  const activeRows = rows.filter(r => r.Status !== 'OFFLINE');
+  const base = activeRows.length ? activeRows : rows;
+  const avg = (key) => base.length ? base.reduce((s, r) => s + r[key], 0) / base.length : 0;
+  const avgOee = avg('OEE (%)');
+  const totalProd = rows.reduce((s, r) => s + r.Produced, 0);
+  const runningCount = rows.filter(r => r.Status === 'RUNNING').length;
+  const downToday = state.machineList.reduce((s, n) => s + num(state.machines[n]?.timeDistribution?.[1]), 0);
+
+  // --- KPI boxes ---
+  const kpis = [
+    { label: 'Average OEE',      value: `${avgOee.toFixed(1)}%`,             color: avgOee >= target ? [16, 185, 129] : [245, 158, 11] },
+    { label: 'Total Produced',   value: `${fmt(totalProd)} pcs`,             color: BRAND.sky },
+    { label: 'Running Machines', value: `${runningCount} / ${rows.length}`,  color: [59, 130, 246] },
+    { label: 'Downtime Today',   value: `${fmt(downToday)} min`,             color: [239, 68, 68] },
+  ];
+  const gap = 3.5, boxW = (182 - gap * 3) / 4, boxY = 48;
+  kpis.forEach((k, i) => {
+    const x = 14 + i * (boxW + gap);
+    doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
+    doc.roundedRect(x, boxY, boxW, 20, 2, 2, 'FD');
+    doc.setFillColor(...k.color);
+    doc.rect(x, boxY + 3, 1.2, 14, 'F');
+    doc.setFont(FONT, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+    doc.text(k.label, x + 4, boxY + 7);
+    doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy);
+    doc.text(k.value, x + 4, boxY + 15);
+  });
+
+  const heading = (text, y) => {
+    doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy);
+    doc.text(text, 14, y);
+    doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.6);
+    doc.line(14, y + 2, 40, y + 2);
+  };
+  const subText = (text, y) => {
+    doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(...BRAND.slate);
+    doc.text(text, 14, y);
+  };
+  const ensureSpace = (y, need) => (y + need > 272 ? (doc.addPage(), 20) : y);
+  const tableBase = {
+    theme: 'grid',
+    margin: { left: 14, right: 14 },
+    styles: { font: FONT, fontSize: 8, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [51, 65, 85] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  };
+
+  // --- SECTION 1: Daily Summary ---
+  let y = 80;
+  heading(L('1. Daily Production Summary', 'สรุปผลการผลิตรายวัน'), y);
+  subText(`${L('Date', 'วันที่')}: ${now.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}   |   Target OEE: ${target}%`, y + 8);
+
+  doc.autoTable({
+    ...tableBase,
+    startY: y + 11,
+    head: [['Machine', 'Status', 'Job No', 'Produced', 'Target', 'OEE %', 'Avail %', 'Perf %', 'Qual %']],
+    body: rows.map(r => [r.Machine, r.Status, r['Job No'], fmt(r.Produced), fmt(r.Target),
+      r['OEE (%)'].toFixed(1), r['Availability (%)'].toFixed(1), r['Performance (%)'].toFixed(1), r['Quality (%)'].toFixed(1)]),
+    headStyles: { fillColor: BRAND.navy, textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
+    didParseCell: (h) => {
+      if (h.section !== 'body') return;
+      if (h.column.index === 1) h.cell.styles.textColor = STATUS_PDF_COLOR[h.cell.raw] || [100, 116, 139];
+      if (h.column.index === 5) h.cell.styles.textColor = parseFloat(h.cell.raw) >= target ? [5, 150, 105] : [217, 119, 6];
+    },
+  });
+
+  // --- SECTION 2: Monthly / Yearly Projection ---
+  y = ensureSpace(doc.lastAutoTable.finalY + 14, 55);
+  heading(L('2. Monthly & Yearly Projection', 'แนวโน้มรายเดือนและรายปี'), y);
+  subText(`${L('Month', 'เดือน')}: ${now.toLocaleString(locale, { month: 'long', year: 'numeric' })}   |   Est. monthly (22 days): ${fmt(totalProd * 22)} pcs   |   Est. yearly (260 days): ${fmt(totalProd * 260)} pcs`, y + 8);
+
+  const avgMap = { oee: avgOee, availability: avg('Availability (%)'), performance: avg('Performance (%)'), quality: avg('Quality (%)') };
+  doc.autoTable({
+    ...tableBase,
+    startY: y + 11,
+    head: [['Metric', 'Target', 'Current Average', 'Gap', 'Assessment']],
+    body: KPI_DEFS.map(k => {
+      const t = k.target(), v = avgMap[k.key], gapPt = v - t;
+      const assess = gapPt >= 0 ? 'PASSED' : gapPt > -5 ? 'MONITORING' : 'NEEDS IMPROVEMENT';
+      return [k.label, `${t.toFixed(1)}%`, `${v.toFixed(1)}%`, `${gapPt >= 0 ? '+' : ''}${gapPt.toFixed(1)} pt`, assess];
+    }),
+    headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+    didParseCell: (h) => {
+      if (h.section !== 'body' || h.column.index !== 4) return;
+      h.cell.styles.fontStyle = 'bold';
+      h.cell.styles.textColor = h.cell.raw === 'PASSED' ? [5, 150, 105] : h.cell.raw === 'MONITORING' ? [217, 119, 6] : [220, 38, 38];
+    },
+  });
+
+  // --- SECTION 3: Downtime Pareto (all machines) + กราฟ ---
+  const pareto = analyzePareto(aggregatePareto(state.paretoRange));
+  const IMG_W = 178;                                            // mm
+  const IMG_H = IMG_W * PDF_CHART_SIZE.h / PDF_CHART_SIZE.w;    // ≈ 80 mm (รักษาอัตราส่วน)
+  const chartImg = await buildParetoChartImage(pareto);
+  const chartBlock = chartImg ? IMG_H + 16 : 0;
+
+  // ให้หัวข้อ + กราฟ + หัวตารางอยู่หน้าเดียวกัน
+  y = ensureSpace(doc.lastAutoTable.finalY + 14, 11 + chartBlock + 30);
+  heading(L('3. Downtime Pareto - All Machines', 'สาเหตุการหยุดเครื่องหลัก'), y);
+  subText(`Range: Last ${state.paretoRange} day(s)   |   Total downtime: ${fmt(pareto.total)} min (${fmt(pareto.total / 60, 1)} hrs)   |   Vital few: ${pareto.vitalCount} cause(s)`, y + 8);
+
+  let tableY = y + 11;
+  if (chartImg) {
+    const boxY = y + 12;
+    // กรอบการ์ดรอบกราฟ
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(14, boxY, 182, IMG_H + 4, 2, 2, 'FD');
+    doc.addImage(chartImg, 'PNG', 16, boxY + 2, IMG_W, IMG_H, 'pareto-all', 'FAST');
+
+    // คำอธิบายใต้กราฟ
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Red bars = vital few causes (~80% of total downtime)   |   Navy line = cumulative %   |   Dashed line = 80% threshold', 14, boxY + IMG_H + 9);
+
+    tableY = boxY + IMG_H + 12;
+  } else if (pareto.rows.length) {
+    console.warn('[PDF] Pareto chart skipped — table only.');
+  }
+
+  doc.autoTable({
+    ...tableBase,
+    startY: tableY,
+    head: [['Rank', 'Downtime Cause', 'Lost Time (min)', 'Share %', 'Cumulative %', 'Impact']],
+    body: pareto.rows.map((r, i) => [
+      i + 1, r.label, fmt(r.value), r.share.toFixed(1), r.cumulative.toFixed(1),
+      i < pareto.vitalCount ? 'HIGH' : r.share >= 5 ? 'MEDIUM' : 'LOW',
+    ]),
+    headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 0: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'center' } },
+    didParseCell: (h) => {
+      if (h.section !== 'body' || h.column.index !== 5) return;
+      h.cell.styles.fontStyle = 'bold';
+      h.cell.styles.textColor = h.cell.raw === 'HIGH' ? [220, 38, 38] : h.cell.raw === 'MEDIUM' ? [217, 119, 6] : [100, 116, 139];
+    },
+  });
+
+  // --- Footer ทุกหน้า ---
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
+    doc.line(14, 284, 196, 284);
+    doc.setFont(FONT, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+    doc.text(`${BRAND.company} - OEE Plant System`, 14, 289);
+    doc.text(`Page ${i} of ${pages}`, 196, 289, { align: 'right' });
+  }
+
+  doc.save(`TFC_OEE_Executive_Report_${todayISO()}.pdf`);
+  showToast(thai ? 'Exported PDF successfully!' : 'Exported PDF (English only — Thai font not found)', thai ? 'success' : 'warn');
+}
+
+/* =========================================================
+ * 9) NAVIGATION
+ * ========================================================= */
+function closeSidebarMobile() {
+  if (window.innerWidth < 768) {
+    $('sidebar').classList.add('-translate-x-full');
+    $('sidebarOverlay').classList.add('hidden');
+  }
+}
+
+function showSection(name) {
+  if (!SECTION_TITLES[name]) name = 'overview';
+  state.activeSection = name;
+
+  document.querySelectorAll('.page-section').forEach(s => s.classList.toggle('is-active', s.id === `section-${name}`));
+  document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('is-active', btn.dataset.section === name));
+  $('page-title').textContent = SECTION_TITLES[name];
+
+  const showSelect = !['overview', 'settings'].includes(name);
+  $('globalMachineSelect').classList.toggle('hidden', !showSelect);
+  if (showSelect && state.selectedMachine) $('globalMachineSelect').value = state.selectedMachine;
+  if (name === 'settings') fillSettingsForm();
+
+  closeSidebarMobile();
+  renderActiveSection();
+}
+
+function updateMachineDropdown() {
+  const select = $('globalMachineSelect');
+  if (!state.machineList.includes(state.selectedMachine)) state.selectedMachine = state.machineList[0] || '';
+  const html = state.machineList.map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+  if (select.dataset.html !== html) { select.innerHTML = html; select.dataset.html = html; }
+  select.value = state.selectedMachine;
+}
+
+function jumpToMachine(name) {
+  state.selectedMachine = name;
+  $('globalMachineSelect').value = name;
+  showSection('dashboard');
+}
+
+function renderActiveSection() {
+  const d = currentMachine();
+  if (d) ['lbl-product-machine', 'lbl-summary-machine', 'lbl-pareto-machine'].forEach(id => { $(id).textContent = d.machineName; });
+
+  switch (state.activeSection) {
+    case 'overview':      renderOverview(); break;
+    case 'dashboard':     if (d) renderMachineDetail(d); break;
+    case 'oee-product':   if (d) renderProductTable(d); break;
+    case 'daily-summary': if (d) renderDailySummary(d); break;
+    case 'pareto':        if (d) renderPareto(d); break;
+  }
+}
+
+/* =========================================================
+ * 10) RENDER FUNCTIONS
+ * ========================================================= */
+function renderOverview() {
+  const list = state.machineList.map(n => state.machines[n]).filter(Boolean);
+  const target = settings.targetOee;
+  const active = list.filter(d => d.machineState !== 'offline');
+  const avgOee = active.length ? active.reduce((s, d) => s + num(d.oee), 0) / active.length : 0;
+  const count = (st) => list.filter(d => d.machineState === st).length;
+
+  $('overview-stats').innerHTML = [
+    { label: 'Plant Avg OEE',  value: `${fmt(avgOee, 1)}%`, sub: `Target ${target}%`, icon: 'fa-chart-pie', tone: avgOee >= target ? TONE.emerald : TONE.amber },
+    { label: 'Running',        value: `${count('run')} / ${list.length}`, sub: 'machines', icon: 'fa-play', tone: TONE.emerald },
+    { label: 'Breakdown',      value: count('down'), sub: `Idle ${count('idle')} | Offline ${count('offline')}`, icon: 'fa-triangle-exclamation', tone: TONE.red },
+    { label: 'Total Produced', value: fmt(list.reduce((s, d) => s + num(d.produced), 0)), sub: 'pcs today', icon: 'fa-boxes-stacked', tone: TONE.blue },
+  ].map(statCard).join('');
+
+  $('overview-grid').innerHTML = list.length ? list.map(d => {
+    const s = STATUS_MAP[d.machineState] || STATUS_MAP.idle;
+    const pct = d.target > 0 ? (d.produced / d.target) * 100 : 0;
+    const name = escapeHTML(d.machineName);
+    const oeeCls = d.machineState === 'offline' ? 'text-slate-300 dark:text-slate-600'
+      : d.oee >= target ? 'text-emerald-500' : d.oee > 0 ? 'text-amber-500' : 'text-slate-300';
+    return `
+      <div role="button" tabindex="0" data-machine="${name}" class="card relative cursor-pointer border-l-4 ${s.border} transition-all hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+        <div class="mb-4 flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white">${name}</h3>
+            <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">${escapeHTML(d.jobNo)}</p>
+          </div>
+          <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider dark:bg-slate-700 ${s.text} ${s.pulse ? 'live-pulse' : ''}">
+            <span class="h-2 w-2 rounded-full ${s.dot}"></span> ${s.label}
+          </span>
+        </div>
+        <div class="mb-4 flex items-end gap-3">
+          <div class="text-3xl font-black ${oeeCls}">${fmt(d.oee, 1)}<span class="text-lg text-slate-400">%</span></div>
+          <div class="mb-1 text-xs text-slate-500">OEE</div>
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs"><span class="text-slate-500">Progress</span><span class="font-medium text-slate-700 dark:text-slate-300">${fmt(d.produced)} / ${fmt(d.target)}</span></div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+            <div class="h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}" style="width:${clamp(pct, 0, 100)}%"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('') : '<div class="card col-span-full py-12 text-center text-slate-400">No machines found. Check API URLs in Preferences.</div>';
+}
+
+function last7Labels() {
+  return Array.from({ length: 7 }, (_, i) => {
+    if (i === 6) return 'Today';
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return shortDate(d);
+  });
+}
+
+function renderMachineDetail(d) {
+  const target = settings.targetOee;
+  $('dash-machine-name').textContent = `Machine ${d.machineName}`;
+
+  const R = 24, C = 2 * Math.PI * R;
+  $('kpi-grid').innerHTML = KPI_DEFS.map(k => {
+    const val = num(d[k.key]);
+    const diff = val - k.target();
+    const ok = diff >= 0;
+    const cls = ok ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+    return `
+    <article class="card flex items-start justify-between gap-4">
+      <div>
+        <p class="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400"><i class="fa-solid ${k.icon}"></i> ${k.label}</p>
+        <p class="mt-3 text-3xl font-bold tabular-nums text-slate-900 dark:text-white">${fmt(val, 1)}<span class="ml-0.5 text-lg">%</span></p>
+        <div class="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${cls}" title="Target ${k.target()}%">
+          <i class="fa-solid ${ok ? 'fa-arrow-up' : 'fa-arrow-down'}"></i>${Math.abs(diff).toFixed(1)} pt
+        </div>
+      </div>
+      <svg class="h-14 w-14 shrink-0 -rotate-90" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r="${R}" fill="none" stroke="currentColor" class="text-slate-100 dark:text-slate-700" stroke-width="6"></circle>
+        <circle cx="28" cy="28" r="${R}" fill="none" stroke="${k.color}" stroke-width="6" stroke-linecap="round"
+                stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - clamp(val, 0, 100) / 100)}"></circle>
+      </svg>
+    </article>`;
+  }).join('');
+
+  $('val-job-no').textContent = d.jobNo;
+  $('val-part-name').textContent = d.partName;
+  $('val-produced').textContent = fmt(d.produced);
+  $('val-target').textContent = fmt(d.target);
+
+  const pct = d.target > 0 ? (d.produced / d.target) * 100 : 0;
+  const bar = $('progress-bar');
+  bar.style.width = `${clamp(pct, 0, 100)}%`;
+  bar.className = `h-full rounded-full transition-all duration-700 ease-out ${pct >= 100 ? 'bg-emerald-400' : 'bg-white'}`;
+  $('val-progress-pct').textContent = pct.toFixed(1);
+  $('val-remaining').textContent = fmt(Math.max(d.target - d.produced, 0));
+
+  const s = STATUS_MAP[d.machineState] || STATUS_MAP.idle;
+  const badge = $('val-state-badge');
+  badge.className = `inline-flex items-center gap-2 rounded-full bg-white dark:bg-slate-800 px-4 py-1.5 text-sm font-bold shadow-sm ${s.text} ${s.pulse ? 'live-pulse' : ''}`;
+  badge.innerHTML = `<span class="h-2.5 w-2.5 rounded-full ${s.dot}"></span><i class="fa-solid ${s.icon} text-xs"></i><span>${s.label}</span>`;
+
+  // OEE Trend (7 วัน)
+  const trend = state.charts.trend;
+  if (trend) {
+    const data = [...d.trend.slice(-6), num(d.oee)].map(round2);
+    while (data.length < 7) data.unshift(0);
+    trend.data.labels = last7Labels();
+    trend.data.datasets[0].data = Array(7).fill(target);
+    trend.data.datasets[1].data = data;
+    trend.data.datasets[1].backgroundColor = data.map((v, i) => v >= target ? '#10b981' : (i === 6 ? '#3b82f6' : '#93c5fd'));
+    trend.update('none');
+  }
+
+  // Time distribution
+  const time = state.charts.time;
+  if (time) {
+    time.data.datasets[0].data = d.timeDistribution.map(round2);
+    time.update('none');
+  }
+  const totalMin = d.timeDistribution.reduce((a, b) => a + b, 0) || 1;
+  $('time-legend').innerHTML = TIME_DIST.map((t, i) => `
+    <div class="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-700/50">
+      <p class="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><span class="h-2.5 w-2.5 rounded-full" style="background:${t.color}"></span>${t.label}</p>
+      <p class="mt-1 text-lg font-bold tabular-nums text-slate-900 dark:text-white">${((d.timeDistribution[i] / totalMin) * 100).toFixed(0)}%</p>
+      <p class="text-[11px] text-slate-400">${fmt(d.timeDistribution[i])} min</p>
+    </div>`).join('');
+
+  $('last-updated').textContent = new Date().toLocaleTimeString('en-GB');
+}
+
+function renderProductTable(d) {
+  const { rows, mock } = getRangeData(d, 'products', state.productRange);
+  $('product-source').innerHTML = sourceBadge(mock);
+  const target = settings.targetOee;
+
+  if (rows.length) {
+    const best = rows.reduce((a, b) => (b.oee > a.oee ? b : a));
+    const totalProduced = rows.reduce((s, p) => s + p.produced, 0);
+    const avgDefect = rows.reduce((s, p) => s + p.defect, 0) / rows.length;
+    $('product-highlights').innerHTML = [
+      { label: 'Top Performing Part', value: best.part, sub: `OEE ${fmt(best.oee, 1)}%`, icon: 'fa-trophy', tone: TONE.emerald },
+      { label: 'Total Produced', value: `${fmt(totalProduced)} pcs`, sub: `${rows.length} part numbers`, icon: 'fa-boxes-stacked', tone: TONE.blue },
+      { label: 'Average Defect', value: `${fmt(avgDefect, 2)}%`, sub: 'across all parts', icon: 'fa-bug', tone: avgDefect > 2 ? TONE.red : TONE.amber },
+    ].map(statCard).join('');
+  } else {
+    $('product-highlights').innerHTML = '';
+  }
+
+  const q = $('searchInput').value.trim().toLowerCase();
+  const list = rows.filter(p => !q || String(p.job).toLowerCase().includes(q) || String(p.part).toLowerCase().includes(q));
+
+  $('product-tbody').innerHTML = list.length ? list.map(p => {
+    const color = p.oee >= target ? 'bg-emerald-500' : (p.oee >= target - 10 ? 'bg-amber-500' : 'bg-red-500');
+    return `
+      <tr class="transition hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
+        <td class="whitespace-nowrap px-6 py-4 font-semibold text-slate-900 dark:text-white">${escapeHTML(p.job)}</td>
+        <td class="px-6 py-4 text-slate-600 dark:text-slate-300">${escapeHTML(p.part)}</td>
+        <td class="px-6 py-4 text-right tabular-nums">${fmt(p.produced)}</td>
+        <td class="px-6 py-4 text-right tabular-nums text-red-500">${fmt(p.defect, 1)}%</td>
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+              <div class="h-full rounded-full ${color}" style="width:${clamp(p.oee, 0, 100)}%"></div>
+            </div>
+            <span class="w-14 text-right font-semibold tabular-nums">${fmt(p.oee, 1)}%</span>
+          </div>
+        </td>
+      </tr>`;
+  }).join('') : '<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">No results found.</td></tr>';
+}
+
+function renderDailySummary(d) {
+  const date = $('summaryDate').value || todayISO();
+  const s = getDailySummary(d, date);
+  $('sum-produced').textContent = fmt(s.produced);
+  $('sum-oee').textContent = `${fmt(s.oee, 1)}%`;
+  $('sum-downtime').textContent = `${fmt(s.downtime)} min`;
+  $('sum-source').innerHTML = sourceBadge(s.mock);
+}
+
+function renderPareto(d) {
+  const chart = state.charts.pareto;
+  if (!chart) return;
+  const { rows: raw, mock } = getRangeData(d, 'pareto', state.paretoRange);
+  const { rows, total, vitalCount } = analyzePareto(raw);
+  const c = chartColors();
+
+  $('pareto-source').innerHTML = sourceBadge(mock);
+  chart.data.labels = rows.map(r => r.label);
+  chart.data.datasets[0].data = rows.map(r => round2(r.cumulative));
+  chart.data.datasets[1].data = rows.map(() => 80);
+  chart.data.datasets[2].data = rows.map(r => r.value);
+  chart.data.datasets[2].backgroundColor = rows.map((_, i) => (i < vitalCount ? 'rgba(239,68,68,.85)' : c.muted));
+  chart.update('none');
+
+  const top = rows[0];
+  $('pareto-summary').innerHTML = [
+    { label: 'Total Downtime', value: `${fmt(total)} min`, sub: `${fmt(total / 60, 1)} hrs`, icon: 'fa-clock', tone: TONE.blue },
+    { label: 'Top Cause', value: top?.label ?? '—', sub: `${fmt(top?.value)} min (${fmt(top?.share, 1)}%)`, icon: 'fa-fire', tone: TONE.red },
+    { label: 'Vital Few (80%)', value: `${vitalCount} causes`, sub: `of ${rows.length} total`, icon: 'fa-bullseye', tone: TONE.amber },
+  ].map(statCard).join('');
+}
+
+/* =========================================================
+ * 11) CHARTS & THEME
+ * ========================================================= */
+function chartColors() {
+  const dark = document.documentElement.classList.contains('dark');
+  return {
+    text:  dark ? '#94a3b8' : '#64748b',
+    grid:  dark ? '#334155' : '#f1f5f9',
+    line:  dark ? '#f8fafc' : '#0f172a',
+    point: dark ? '#0f172a' : '#ffffff',
+    muted: dark ? 'rgba(71,85,105,.7)' : 'rgba(148,163,184,.7)',
+  };
+}
+
+function initCharts() {
+  const c = chartColors();
+  Chart.defaults.color = c.text;
+  Chart.defaults.font.family = 'Inter, "Noto Sans Thai", sans-serif';
+
   state.charts.trend = new Chart($('oeeChart'), {
     type: 'bar',
     data: {
-      labels: [],
+      labels: last7Labels(),
       datasets: [
-        {
-          type: 'line',
-          label: 'Target',
-          data: [],
-          borderColor: '#ef4444',
-          borderDash: [6, 6],
-          borderWidth: 2,
-          pointRadius: 0,
-          order: 1,
-        },
-        {
-          type: 'bar',
-          label: 'OEE',
-          data: [],
-          backgroundColor: (ctx) => (ctx.raw >= state.settings.oeeTarget ? 'rgba(16,185,129,.85)' : 'rgba(59,130,246,.85)'),
-          hoverBackgroundColor: (ctx) => (ctx.raw >= state.settings.oeeTarget ? '#10b981' : '#3b82f6'),
-          borderRadius: 8,
-          borderSkipped: false,
-          barPercentage: 0.55,
-          order: 2,
-        },
+        { type: 'line', label: 'Target', data: Array(7).fill(settings.targetOee), borderColor: '#ef4444', borderDash: [6, 6], borderWidth: 2, pointRadius: 0, order: 1 },
+        { type: 'bar', label: 'OEE', data: Array(7).fill(0), backgroundColor: '#3b82f6', borderRadius: 6, maxBarThickness: 42, order: 2 },
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` } },
-      },
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${num(ctx.parsed.y).toFixed(1)}%` } } },
       scales: {
-        y: { min: 0, max: 100, ticks: { stepSize: 20, callback: (v) => `${v}%` }, grid: { color: '#f1f5f9' }, border: { display: false } },
+        y: { min: 0, max: 100, grid: { color: c.grid }, border: { display: false }, ticks: { callback: (v) => `${v}%` } },
         x: { grid: { display: false }, border: { display: false } },
       },
     },
   });
-}
 
-function refreshTargetLine() {
-  const chart = state.charts.trend;
-  if (!chart) return;
-  chart.data.datasets[0].data = chart.data.labels.map(() => state.settings.oeeTarget);
-  chart.update();
-}
-
-async function fetchTrend(range = '7', startDate = '', endDate = '') {
-  let labels = [];
-  let values = [];
-  
-  if (range === '1') {
-    labels = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
-    values = [80.2, 85.5, 82.1, 88.0, 90.5, 85.0];
-    $('trend-subtitle').textContent = "Performance today (Hourly)";
-  } else if (range === '7') {
-    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    values = [82.5, 85.0, 88.1, 84.5, 90.0, 87.2, 86.5];
-    $('trend-subtitle').textContent = "Last 7 days vs. target";
-  } else if (range === '30') {
-    labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    values = [84.1, 86.5, 85.0, 88.2];
-    $('trend-subtitle').textContent = "Last 1 Month vs. target";
-  } else if (range === 'custom') {
-    labels = [startDate, '...', endDate];
-    values = [85.5, 86.0, 87.5]; 
-    $('trend-subtitle').textContent = `Custom Range: ${startDate} to ${endDate}`;
-  }
-
-  const chart = state.charts.trend;
-  if (!chart) return;
-  
-  chart.data.labels = labels;
-  chart.data.datasets[1].data = values;
-  refreshTargetLine();
-}
-
-function initTimeChart() {
-  const values = TIME_DIST.map((d) => d.value);
   state.charts.time = new Chart($('timeChart'), {
     type: 'doughnut',
     data: {
-      labels: TIME_DIST.map((d) => d.label),
-      datasets: [{
-        data: values,
-        backgroundColor: TIME_DIST.map((d) => d.color),
-        borderWidth: 0,
-        borderRadius: 4,
-        spacing: 2,
-        hoverOffset: 6,
-      }],
+      labels: TIME_DIST.map(t => t.label),
+      datasets: [{ data: [1, 1, 1], backgroundColor: TIME_DIST.map(t => t.color), borderWidth: 0 }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '76%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (c) => {
-              const total = c.dataset.data.reduce((a, b) => a + b, 0) || 1;
-              return ` ${c.label}: ${((c.parsed / total) * 100).toFixed(1)}%`;
-            },
-          },
-        },
+      responsive: true, maintainAspectRatio: false, cutout: '75%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmt(ctx.parsed)} min` } } },
+    },
+  });
+
+  state.charts.pareto = new Chart($('paretoChart'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { type: 'line', label: 'Cumulative %', yAxisID: 'y1', data: [], borderColor: c.line, backgroundColor: c.line, borderWidth: 2, pointBackgroundColor: c.point, order: 1 },
+        { type: 'line', label: '80% Line', yAxisID: 'y1', data: [], borderColor: '#f59e0b', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, order: 0 },
+        { type: 'bar', label: 'Downtime (min)', yAxisID: 'y', data: [], borderRadius: 8, order: 2 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } } },
+      scales: {
+        y:  { beginAtZero: true, grid: { color: c.grid }, border: { display: false }, title: { display: true, text: 'Minutes' } },
+        y1: { beginAtZero: true, max: 100, position: 'right', grid: { display: false }, border: { display: false }, ticks: { callback: (v) => `${v}%` } },
+        x:  { grid: { display: false }, border: { display: false } },
       },
     },
-    plugins: [centerTextPlugin],
   });
-  renderTimeLegend(values);
 }
 
-function updateTimeChart(values) {
-  const chart = state.charts.time;
-  if (!chart) return;
-  chart.data.datasets[0].data = values;
-  chart.update();
-  renderTimeLegend(values);
-}
-
-function renderTimeLegend(values) {
-  const total = values.reduce((a, b) => a + b, 0) || 1;
-  $('time-legend').innerHTML = TIME_DIST.map((d, i) => `
-    <div class="rounded-xl bg-slate-50 px-3 py-2.5">
-      <p class="flex items-center gap-2 text-xs text-slate-500">
-        <span class="h-2.5 w-2.5 rounded-full" style="background:${d.color}"></span>${d.label}
-      </p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-slate-900">${((values[i] / total) * 100).toFixed(0)}%</p>
-    </div>`).join('');
-}
-
-/* =========================================================
- * 7) KPI CARDS
- * ========================================================= */
-function renderKpiCards() {
-  $('kpi-grid').innerHTML = KPI_DEFS.map((k) => `
-    <article class="card group relative overflow-hidden transition duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="flex items-center gap-2 text-sm font-medium text-slate-500">
-            <span class="grid h-8 w-8 place-items-center rounded-lg" style="background:${k.color}1a;color:${k.color}">
-              <i class="fa-solid ${k.icon} text-sm"></i>
-            </span>
-            ${k.label}
-          </p>
-          <p class="mt-3 text-3xl font-bold tracking-tight tabular-nums text-slate-900">
-            <span id="kpi-${k.key}-value">0.0</span><span class="ml-0.5 text-lg font-semibold text-slate-400">%</span>
-          </p>
-        </div>
-        <svg class="h-16 w-16 shrink-0 -rotate-90" viewBox="0 0 64 64" aria-hidden="true">
-          <circle cx="32" cy="32" r="26" fill="none" stroke="#f1f5f9" stroke-width="7"></circle>
-          <circle id="kpi-${k.key}-ring" class="ring-progress" cx="32" cy="32" r="26" fill="none"
-                  stroke="${k.color}" stroke-width="7" stroke-linecap="round"
-                  stroke-dasharray="${RING_C}" style="stroke-dashoffset:${RING_C}px"></circle>
-        </svg>
-      </div>
-      <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-        <span class="text-slate-500">Target <b id="kpi-${k.key}-target" class="text-slate-700">—</b></span>
-        <span id="kpi-${k.key}-chip" class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-500">—</span>
-      </div>
-      <span class="absolute inset-x-0 bottom-0 h-1 origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100" style="background:${k.color}"></span>
-    </article>`).join('');
-}
-
-/* =========================================================
- * 8) PARETO
- * ========================================================= */
-function preparePareto(labels, downtime) {
-  const rows = labels
-    .map((label, i) => ({ label, value: toNum(downtime?.[i]) }))
-    .sort((a, b) => b.value - a.value);
-  const total = rows.reduce((s, r) => s + r.value, 0);
-  let running = 0;
-  rows.forEach((r) => {
-    running += r.value;
-    r.cumulative = total ? +((running / total) * 100).toFixed(1) : 0;
-  });
-  return { rows, total };
-}
-
-async function fetchAndRenderPareto() {
-  const btn = $('btnParetoRefresh');
-  const icon = btn.querySelector('i');
-  const days = $('paretoRange').value;
-
-  btn.disabled = true;
-  icon.classList.add('fa-spin');
-  try {
-    const raw = await fetchJSON(apiUrl(`/api/dashboard/pareto?days=${encodeURIComponent(days)}`));
-    if (raw?.status !== 'success' || !Array.isArray(raw.labels)) throw new Error('Unexpected API response');
-    renderPareto(raw.labels, raw.downtime, false);
-  } catch (err) {
-    console.warn('[OEE] Pareto API unavailable → sample data:', err.message);
-    renderPareto(PARETO_SAMPLE.labels, PARETO_SAMPLE.downtime, true);
-  } finally {
-    btn.disabled = false;
-    icon.classList.remove('fa-spin');
+function applyChartTheme() {
+  const c = chartColors();
+  Chart.defaults.color = c.text;
+  const { trend, time, pareto } = state.charts;
+  if (trend) { trend.options.scales.y.grid.color = c.grid; trend.update('none'); }
+  if (time) time.update('none');
+  if (pareto) {
+    pareto.options.scales.y.grid.color = c.grid;
+    pareto.data.datasets[0].borderColor = c.line;
+    pareto.data.datasets[0].backgroundColor = c.line;
+    pareto.data.datasets[0].pointBackgroundColor = c.point;
+    pareto.update('none');
   }
 }
 
-function renderPareto(labels, downtime, isSample) {
-  if (typeof Chart === 'undefined') return;
-
-  const { rows, total } = preparePareto(labels, downtime);
-  const vitalCount = (rows.findIndex((r) => r.cumulative >= 80) + 1) || rows.length;
-
-  const data = {
-    labels: rows.map((r) => r.label),
-    datasets: [
-      {
-        type: 'line', label: 'Cumulative %', yAxisID: 'y1',
-        data: rows.map((r) => r.cumulative),
-        borderColor: '#0f172a', backgroundColor: '#0f172a', borderWidth: 2,
-        pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', tension: 0.3,
-        order: 1,
-      },
-      {
-        type: 'line', label: '80% Line', yAxisID: 'y1',
-        data: rows.map(() => 80),
-        borderColor: '#f59e0b', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0,
-        order: 0,
-      },
-      {
-        type: 'bar', label: 'Downtime (min)', yAxisID: 'y',
-        data: rows.map((r) => r.value),
-        backgroundColor: rows.map((_, i) => (i < vitalCount ? 'rgba(239,68,68,.85)' : 'rgba(148,163,184,.7)')),
-        borderRadius: 8, borderSkipped: false, barPercentage: 0.6,
-        order: 2,
-      },
-    ],
-  };
-
-  if (state.charts.pareto) {
-    state.charts.pareto.data = data;
-    state.charts.pareto.update();
-  } else {
-    state.charts.pareto = new Chart($('paretoChart'), {
-      type: 'bar',
-      data,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8 } },
-          tooltip: {
-            callbacks: {
-              label: (c) => (c.dataset.yAxisID === 'y1'
-                ? ` ${c.dataset.label}: ${c.parsed.y}%`
-                : ` ${c.dataset.label}: ${fmt(c.parsed.y)} min`),
-            },
-          },
-        },
-        scales: {
-          y:  { beginAtZero: true, title: { display: true, text: 'Minutes' }, grid: { color: '#f1f5f9' }, border: { display: false } },
-          y1: { beginAtZero: true, max: 100, position: 'right', title: { display: true, text: 'Cumulative %' }, ticks: { callback: (v) => `${v}%` }, grid: { display: false }, border: { display: false } },
-          x:  { grid: { display: false }, border: { display: false } },
-        },
-      },
-    });
-  }
-
-  const top = rows[0];
-  $('pareto-summary').innerHTML = [
-    { label: 'Total Downtime', value: `${fmt(total)} min`, icon: 'fa-clock', tone: 'bg-blue-50 text-blue-600' },
-    {
-      label: 'Top Cause', value: top?.label ?? '—',
-      sub: top && total ? `${fmt(top.value)} min (${((top.value / total) * 100).toFixed(0)}% of total)` : '',
-      icon: 'fa-fire', tone: 'bg-red-50 text-red-600',
-    },
-    { label: 'Vital Few (≈80%)', value: `${vitalCount} of ${rows.length} causes`, icon: 'fa-bullseye', tone: 'bg-amber-50 text-amber-600' },
-  ].map(statCard).join('');
-
-  $('pareto-source').textContent = isSample ? 'Sample data (API unavailable)' : 'Live data';
+function updateThemeIcon() {
+  const dark = document.documentElement.classList.contains('dark');
+  $('themeToggleIconDark').classList.toggle('hidden', !dark);
+  $('themeToggleIconLight').classList.toggle('hidden', dark);
 }
 
 /* =========================================================
- * 9) OEE PRODUCT TABLE
+ * 12) INIT
  * ========================================================= */
-async function fetchProducts(range = '1', startDate = '', endDate = '') {
-  try {
-    let mockItems = [...SAMPLE_PRODUCTS];
-    if (range === '1') {
-      mockItems = [SAMPLE_PRODUCTS[0], SAMPLE_PRODUCTS[1]];
-    } else if (range === '7') {
-      mockItems = SAMPLE_PRODUCTS.slice(0, 4);
-    }
-    state.products = mockItems;
-  } catch (err) {
-    state.products = SAMPLE_PRODUCTS;
-  }
-
-  renderProductHighlights();
-  renderProducts($('searchInput').value);
+function tickClock() {
+  const now = new Date();
+  $('clock-time').textContent = now.toLocaleTimeString('en-GB');
+  $('clock-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function renderProductHighlights() {
-  const list = state.products;
-  if (!list.length) { $('product-highlights').innerHTML = ''; return; }
-  const best = maxBy(list, (p) => p.oee);
-  const most = maxBy(list, (p) => p.produced);
-  const worst = maxBy(list, (p) => p.defect);
-
-  $('product-highlights').innerHTML = [
-    { label: 'Top Performing Part', value: best.part,  sub: `OEE ${fmt(best.oee, 1)}%`,       icon: 'fa-trophy',               tone: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Most Produced',       value: most.part,  sub: `${fmt(most.produced)} pcs`,       icon: 'fa-boxes-stacked',        tone: 'bg-blue-50 text-blue-600' },
-    { label: 'Highest Defect Rate', value: worst.part, sub: `Defect ${fmt(worst.defect, 1)}%`, icon: 'fa-triangle-exclamation', tone: 'bg-red-50 text-red-600' },
-  ].map(statCard).join('');
+function startApp() {
+  if (state.started) return;
+  state.started = true;
+  $('sidebar-user').textContent = currentUser();
+  state.assetsPromise = preloadPdfAssets();
+  showSection(state.activeSection);
+  pollData();
 }
 
-function renderProducts(filter = '') {
-  const q = filter.trim().toLowerCase();
-  const target = state.settings.oeeTarget;
-  const rows = state.products.filter((p) => !q || p.job.toLowerCase().includes(q) || p.part.toLowerCase().includes(q));
-
-  $('product-tbody').innerHTML = rows.length
-    ? rows.map((p) => {
-        const color = p.oee >= target ? 'bg-emerald-500' : p.oee >= target - 10 ? 'bg-amber-500' : 'bg-red-500';
-        return `
-          <tr class="transition hover:bg-slate-50/80">
-            <td class="whitespace-nowrap px-6 py-4 font-semibold text-slate-900">${escapeHTML(p.job)}</td>
-            <td class="px-6 py-4 text-slate-600">${escapeHTML(p.part)}</td>
-            <td class="px-6 py-4 text-right tabular-nums">${fmt(p.produced)}</td>
-            <td class="px-6 py-4 text-right tabular-nums ${p.defect > 3 ? 'font-semibold text-red-600' : ''}">${fmt(p.defect, 1)}%</td>
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div class="h-full rounded-full ${color}" style="width:${clamp(p.oee, 0, 100)}%"></div>
-                </div>
-                <span class="w-14 text-right font-semibold tabular-nums">${fmt(p.oee, 1)}%</span>
-              </div>
-            </td>
-          </tr>`;
-      }).join('')
-    : `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">
-         <i class="fa-solid fa-magnifying-glass mb-2 block text-2xl"></i>
-         No results for "${escapeHTML(filter)}"
-       </td></tr>`;
-
-  $('product-filter-label').textContent = q ? `Filtered: "${filter}" (${rows.length})` : `${rows.length} parts`;
-}
-
-/* =========================================================
- * 10) EXPORT CSV
- * ========================================================= */
-function exportSnapshotCSV() {
-  const d = state.lastData;
-  if (!d) return showToast('No data to export yet', 'error');
-
-  const rows = [
-    ['Machine', d.machineName],
-    ['Exported At', new Date().toLocaleString('en-GB')],
-    ['Data Source', state.isDemo ? 'Demo (simulated)' : 'Live API'],
-    [],
-    ['Job No', d.jobNo],
-    ['Part Name', d.partName],
-    ['Produced', d.produced],
-    ['Target Qty', d.target],
-    ['Machine State', d.machineState.toUpperCase()],
-    [],
-    ['Metric', 'Value (%)', 'Target (%)'],
-    ...KPI_DEFS.map((k) => [k.label, toNum(d[k.key]).toFixed(2), k.target().toFixed(2)]),
-  ];
-
-  const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `OEE_${d.machineName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`,
-  });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  showToast('Exported CSV successfully');
-}
-
-/* =========================================================
- * 11) SETTINGS
- * ========================================================= */
-function fillSettingsForm() {
-  const f = $('settingsForm');
-  f.machineName.value = state.settings.machineName;
-  f.oeeTarget.value = state.settings.oeeTarget;
-  f.apiBase.value = state.settings.apiBase;
-  f.refreshSec.value = state.settings.refreshSec;
-}
-
-function applySettings() {
-  $('dash-machine-name').textContent = state.settings.machineName;
-  refreshTargetLine();
-  if (state.lastData) KPI_DEFS.forEach((k) => updateKpi(k, state.lastData[k.key]));
-  renderProducts($('searchInput').value);
-  pollLive();
-}
-
-/* =========================================================
- * 12) CLOCK
- * ========================================================= */
-function startClock() {
-  const tick = () => {
-    const now = new Date();
-    $('clock-time').textContent = now.toLocaleTimeString('en-GB');$('clock-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-  };
-  tick();
-  setInterval(tick, 1000);
-}
-
-function todayLocalISO() {
-  const t = new Date();
-  t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
-  return t.toISOString().slice(0, 10);
-}
-
-/* =========================================================
- * 13) EVENT BINDING
- * ========================================================= */
-function bindEvents() {
-  document.querySelectorAll('.nav-item').forEach((btn) => {
-    btn.addEventListener('click', () => showSection(btn.dataset.section));
-  });
-
-  $('openSidebar').addEventListener('click', openSidebar);
-  $('closeSidebar').addEventListener('click', closeSidebar);$('sidebarOverlay').addEventListener('click', closeSidebar);
-  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => { if (e.matches) closeSidebar(); });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeSidebar();
-    const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
-    if (e.key === '/' && !typing) {
-      e.preventDefault();
-      $('searchInput').focus();
-    }
-  });
-
-  $('searchForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    renderProducts($('searchInput').value);
-    showSection('oee-product');
-  });
-  $('searchInput').addEventListener('input', (e) => {
-    if (!e.target.value) renderProducts('');
-  });
-
-  $('btnRefresh').addEventListener('click', pollLive);$('btnExport').addEventListener('click', exportSnapshotCSV);
-
-  // Dropdown Events for OEE Trend
-  $('trendRange').addEventListener('change', (e) => {
-    const isCustom = e.target.value === 'custom';
-    $('trendCustomDates').classList.toggle('hidden', !isCustom);$('trendCustomDates').classList.toggle('flex', isCustom);
-    if (!isCustom) {
-      fetchTrend(e.target.value);
-    }
-  });
-  $('btnTrendApply').addEventListener('click', () => {
-    const start = $('trendDateStart').value;
-    const end = $('trendDateEnd').value;
-    if (start && end) {
-      fetchTrend('custom', start, end);
-    } else {
-      showToast('Please select both start and end dates', 'error');
-    }
-  });
-
-  // Dropdown Events for OEE Product
-  $('productRange').addEventListener('change', (e) => {
-    const isCustom = e.target.value === 'custom';
-    $('productCustomDates').classList.toggle('hidden', !isCustom);$('productCustomDates').classList.toggle('flex', isCustom);
-    if (!isCustom) {
-      fetchProducts(e.target.value);
-    }
-  });
-  $('btnProductApply').addEventListener('click', () => {
-    const start = $('productDateStart').value;
-    const end = $('productDateEnd').value;
-    if (start && end) {
-      fetchProducts('custom', start, end);
-    } else {
-      showToast('Please select both start and end dates', 'error');
-    }
-  });
-
-  $('btnParetoRefresh').addEventListener('click', fetchAndRenderPareto);$('paretoRange').addEventListener('change', fetchAndRenderPareto);
-
-  $('btnToday').addEventListener('click', () => { $('summaryDate').value = todayLocalISO(); });$('btnLoadSummary').addEventListener('click', () => showToast('Daily report API is not connected yet', 'info'));
-
-  $('settingsForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const f = e.target;
-    state.settings = {
-      machineName: f.machineName.value.trim() || DEFAULT_SETTINGS.machineName,
-      oeeTarget: clamp(toNum(f.oeeTarget.value, DEFAULT_SETTINGS.oeeTarget), 0, 100),
-      apiBase: f.apiBase.value.trim() || DEFAULT_SETTINGS.apiBase,
-      refreshSec: clamp(toNum(f.refreshSec.value, DEFAULT_SETTINGS.refreshSec), 1, 60),
-    };
-    saveSettings(state.settings);
-    applySettings();
-    showToast('Settings saved');
-  });
-
-  $('btnResetSettings').addEventListener('click', () => {
-    localStorage.removeItem(STORAGE_KEY);
-    state.settings = { ...DEFAULT_SETTINGS };
-    fillSettingsForm();
-    applySettings();
-    showToast('Settings reset to default', 'info');
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) clearTimeout(state.pollTimer);
-    else pollLive();
-  });
-}
-
-/* =========================================================
- * 14) INIT
- * ========================================================= */
 document.addEventListener('DOMContentLoaded', () => {
-  renderKpiCards();
+  updateThemeIcon();
   initCharts();
-  
-  fetchTrend('7');
-  fetchProducts('1'); // เริ่มต้นแสดงข้อมูลเฉพาะวันที่ปัจจุบัน (Today)
-
   fillSettingsForm();
-  bindEvents();
-  startClock();
 
-  $('year').textContent = new Date().getFullYear();$('summaryDate').value = todayLocalISO();
-  
-  $('trendDateStart').value = todayLocalISO();$('trendDateEnd').value = todayLocalISO();
-  $('productDateStart').value = todayLocalISO();$('productDateEnd').value = todayLocalISO();
+  // Login
+  $('loginForm').addEventListener('submit', handleLogin);
+  ['loginUser', 'loginPass'].forEach(id => $(id).addEventListener('input', () => $('login-error').classList.add('hidden')));
 
-  $('dash-machine-name').textContent = state.settings.machineName;
+  // Navigation
+  document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.section)));
+  $('logoHome').addEventListener('click', () => showSection('overview'));
+  $('openSidebar').addEventListener('click', () => {
+    $('sidebar').classList.remove('-translate-x-full');
+    $('sidebarOverlay').classList.remove('hidden');
+  });
+  $('closeSidebar').addEventListener('click', () => {
+    $('sidebar').classList.add('-translate-x-full');
+    $('sidebarOverlay').classList.add('hidden');
+  });
+  $('sidebarOverlay').addEventListener('click', () => $('closeSidebar').click());
 
-  showSection(location.hash.slice(1) || 'dashboard', { updateHash: false });
-  setConnection('connecting');
-  pollLive();
+  // Overview cards (event delegation — ปลอดภัยกว่า onclick แบบฝัง string)
+  $('overview-grid').addEventListener('click', (e) => {
+    const card = e.target.closest('[data-machine]');
+    if (card) jumpToMachine(card.dataset.machine);
+  });
+  $('overview-grid').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('[data-machine]');
+    if (card) { e.preventDefault(); jumpToMachine(card.dataset.machine); }
+  });
+
+  // Machine selector & filters
+  $('globalMachineSelect').addEventListener('change', (e) => { state.selectedMachine = e.target.value; renderActiveSection(); });
+  $('searchInput').addEventListener('input', () => { if (state.activeSection === 'oee-product') renderActiveSection(); });
+  $('productRange').addEventListener('change', (e) => { state.productRange = parseInt(e.target.value, 10); renderActiveSection(); });
+  $('paretoRange').addEventListener('change', (e) => { state.paretoRange = parseInt(e.target.value, 10); renderActiveSection(); });
+
+  // Daily summary
+  $('summaryDate').value = todayISO();
+  $('summaryDate').max = todayISO();
+  $('summaryDate').addEventListener('change', () => renderActiveSection());
+  $('btnViewLogs').addEventListener('click', loadDailySummary);
+
+  // Theme toggle
+  $('themeToggle').addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    updateThemeIcon();
+    applyChartTheme();
+    renderActiveSection();
+  });
+
+  // Clock & year
+  $('year').textContent = new Date().getFullYear();
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // เริ่มระบบถ้าล็อกอินอยู่แล้ว
+  if (sessionStorage.getItem(AUTH_KEY)) startApp();
+  else $('loginUser').focus();
 });
 </script>
 </body>
