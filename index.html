@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="assets/tfc-logo.png">
   <meta name="theme-color" content="#0b2340">
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS (Play CDN — สำหรับ production แนะนำให้ build ด้วย Tailwind CLI) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -179,6 +179,16 @@
       <button type="button" data-section="settings" class="nav-item relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white">
         <i class="fa-solid fa-gear w-5 text-center"></i><span>Preferences</span>
       </button>
+
+      <!-- Export สำหรับมือถือ (บนจอใหญ่ใช้ปุ่มใน Header) -->
+      <div class="sm:hidden">
+        <p class="mb-2 mt-8 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Export Report</p>
+        <div class="grid grid-cols-3 gap-2 px-3">
+          <button type="button" onclick="exportReport('csv')" class="flex flex-col items-center gap-1 rounded-lg bg-white/5 py-2.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-emerald-400"><i class="fa-solid fa-file-csv text-base"></i>CSV</button>
+          <button type="button" onclick="exportReport('excel')" class="flex flex-col items-center gap-1 rounded-lg bg-white/5 py-2.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-emerald-400"><i class="fa-solid fa-file-excel text-base"></i>Excel</button>
+          <button type="button" onclick="exportReport('pdf')" class="flex flex-col items-center gap-1 rounded-lg bg-white/5 py-2.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-red-400"><i class="fa-solid fa-file-pdf text-base"></i>PDF</button>
+        </div>
+      </div>
     </nav>
 
     <!-- User card -->
@@ -209,15 +219,24 @@
           <p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">TFC · OEE Dashboard</p>
           <p id="page-title" class="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">Plant Overview</p>
         </div>
-        <!-- Global Machine Selector (แสดงได้ทั้งมือถือและเดสก์ท็อป) -->
+        <!-- Global Machine Selector -->
         <select id="globalMachineSelect" class="input hidden h-8 w-auto cursor-pointer border-none bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-900/30 dark:text-sky-400" aria-label="Select machine"></select>
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
         <span id="conn-status" class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"></span>
 
-        <!-- Export buttons -->
+        <!-- Export buttons + Range Selector -->
         <div class="hidden items-center gap-1.5 rounded-lg bg-slate-100 p-1 dark:bg-slate-700/50 sm:flex">
+          <div class="flex items-center">
+            <i class="fa-solid fa-filter ml-2 text-xs text-slate-400"></i>
+            <select id="exportRange" class="input h-7 w-auto cursor-pointer border-none bg-transparent py-0 pl-1.5 pr-6 text-xs font-semibold text-slate-600 focus:ring-0 dark:text-slate-300" title="Select Data Range for Export">
+              <option value="1" selected>1 Day</option>
+              <option value="7">7 Days</option>
+              <option value="30">30 Days</option>
+            </select>
+          </div>
+          <div class="h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
           <button type="button" onclick="exportReport('csv')" class="btn-export hover:text-emerald-600" title="Export CSV"><i class="fa-solid fa-file-csv"></i><span class="hidden xl:inline">CSV</span></button>
           <button type="button" onclick="exportReport('excel')" class="btn-export hover:text-emerald-600" title="Export Excel"><i class="fa-solid fa-file-excel"></i><span class="hidden xl:inline">Excel</span></button>
           <button type="button" onclick="exportReport('pdf')" class="btn-export hover:text-red-600" title="Export PDF Report"><i class="fa-solid fa-file-pdf"></i><span class="hidden xl:inline">PDF</span></button>
@@ -244,7 +263,7 @@
       <div class="mx-auto w-full max-w-[1600px] flex-1 p-4 sm:p-6 lg:p-8">
 
         <!-- Connection banner (Demo / Offline) -->
-        <div id="conn-banner" class="mb-6 hidden items-center gap-3 rounded-xl border px-4 py-3 text-sm"></div>
+        <div id="conn-banner" class="mb-6 hidden"></div>
 
         <!-- ===================== 1) PLANT OVERVIEW ===================== -->
         <section id="section-overview" class="page-section is-active">
@@ -307,6 +326,54 @@
             </div>
           </div>
 
+          <!-- ===================== TIMELINE: แผนเทียบการผลิตจริง ===================== -->
+          <div id="timeline-section" class="card mb-6 hidden">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 class="card-title flex flex-wrap items-center gap-2">
+                  <span class="rounded bg-[#24427b] px-3 py-1 text-sm text-white shadow">แผนเทียบการผลิตจริง</span>
+                  <span id="tl-machine" class="rounded bg-slate-800 px-2 py-1 text-xs text-white dark:bg-slate-600">—</span>
+                  <span id="tl-source"></span>
+                </h3>
+                <p id="tl-subtitle" class="card-subtitle mt-2">—</p>
+              </div>
+              <div id="tl-range" class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/40">
+                <button type="button" data-hours="9" class="tl-range-btn rounded px-3 py-1.5 text-xs font-semibold">08:30–17:30</button>
+                <button type="button" data-hours="24" class="tl-range-btn rounded px-3 py-1.5 text-xs font-semibold">24 ชั่วโมง</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto pb-2">
+              <!-- pt-9 เผื่อที่ให้ป้าย "ขณะนี้" ไม่ถูกตัด / pr-4 เผื่อป้ายเวลาสุดท้าย -->
+              <div class="relative min-w-[900px] pr-4 pt-9">
+                <div class="flex">
+                  <div class="w-[120px] shrink-0"></div>
+                  <div id="tl-axis" class="relative h-6 flex-1 border-b border-slate-200 text-xs font-medium text-slate-500 dark:border-slate-700 dark:text-slate-400"></div>
+                </div>
+                <div class="mt-4 flex h-10 items-center">
+                  <div class="w-[120px] shrink-0 text-center text-sm font-bold text-slate-700 dark:text-slate-300">แผนงาน</div>
+                  <div id="tl-plan-track" class="relative h-full flex-1 overflow-hidden rounded bg-slate-50 dark:bg-slate-900/40"></div>
+                </div>
+                <div class="mt-4 flex h-10 items-center">
+                  <div class="w-[120px] shrink-0 text-center text-sm font-bold text-slate-700 dark:text-slate-300">เกิดขึ้นจริง</div>
+                  <div id="tl-actual-track" class="relative h-full flex-1 overflow-hidden rounded bg-slate-50 dark:bg-slate-900/40"></div>
+                </div>
+                <!-- เลเยอร์เส้นเวลาปัจจุบัน: จัดแนวตรงกับ track พอดี -->
+                <div class="pointer-events-none absolute bottom-0 left-[120px] right-4 top-7">
+                  <div id="tl-now" class="absolute inset-y-0 z-20 hidden w-0.5 -translate-x-1/2 bg-red-600">
+                    <span class="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#bd1e33] px-3 py-1 text-xs font-bold text-white shadow-md">ขณะนี้ <span id="tl-now-text">--:--</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4 dark:border-slate-700">
+              <div id="tl-legend" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400"></div>
+              <div id="tl-finish" class="rounded border px-3 py-1.5 text-xs font-semibold"></div>
+            </div>
+            <p class="mt-2 text-center text-[10px] text-slate-400">สีทึบ = เกิดขึ้นแล้ว · เส้นประ = คาดการณ์ · แถวบน = แผนงาน</p>
+          </div>
+
           <div id="kpi-grid" class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4"></div>
 
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -317,13 +384,25 @@
               </div>
               <div class="relative h-72"><canvas id="oeeChart"></canvas></div>
             </div>
-            <div class="card">
-              <div class="mb-4">
-                <h3 class="card-title">Time Distribution</h3>
-                <p class="card-subtitle">Today</p>
+
+            <!-- TIME DISTRIBUTION CARDS -->
+            <div class="flex flex-col gap-6">
+              <div class="card">
+                <div class="mb-4">
+                  <h3 class="card-title">Time Distribution</h3>
+                  <p class="card-subtitle">Today</p>
+                </div>
+                <div class="relative h-56"><canvas id="timeChart"></canvas></div>
+                <div id="time-legend" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
               </div>
-              <div class="relative h-56"><canvas id="timeChart"></canvas></div>
-              <div id="time-legend" class="mt-5 grid grid-cols-3 gap-2"></div>
+
+              <div class="card">
+                <div class="mb-4">
+                  <h3 class="card-title">Current Part Time</h3>
+                  <p class="card-subtitle">สัดส่วนเวลาของ Part ที่กำลังผลิตในปัจจุบัน</p>
+                </div>
+                <div id="current-part-time-legend" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -349,7 +428,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-6 py-4 dark:border-slate-700">
               <div>
                 <h3 class="card-title">Parts Breakdown</h3>
-                <p class="card-subtitle flex items-center gap-2">Showing data for the selected machine <span id="product-source"></span></p>
+                <p class="card-subtitle flex items-center gap-2">Click any row to view details <span id="product-source"></span></p>
               </div>
               <input id="searchInput" type="search" placeholder="Search Job / Part..." class="input w-56 text-sm">
             </div>
@@ -358,8 +437,10 @@
                 <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                   <tr>
                     <th class="border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">Job No</th>
-                    <th class="border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">Part</th>
+                    <th class="border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">Part No</th>
                     <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">Produced</th>
+                    <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">Setup (min)</th>
+                    <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">QC (min)</th>
                     <th class="border-b border-slate-200 px-6 py-3 text-right font-semibold dark:border-slate-700">Defect</th>
                     <th class="w-64 border-b border-slate-200 px-6 py-3 font-semibold dark:border-slate-700">OEE</th>
                   </tr>
@@ -451,7 +532,7 @@
               <label class="grid gap-2 sm:grid-cols-[1fr_20rem] sm:items-start">
                 <span>
                   <span class="block text-sm font-medium text-slate-800 dark:text-white">API Base URLs</span>
-                  <span class="block text-xs text-slate-500 dark:text-slate-400">One URL per line (or comma separated), e.g. http://192.168.1.101:5000</span>
+                  <span class="block text-xs text-slate-500 dark:text-slate-400">One URL per line (or comma separated), e.g. http://***.***.*.***:****</span>
                 </span>
                 <textarea id="apiUrlsInput" rows="6" class="input font-mono text-xs"></textarea>
               </label>
@@ -483,8 +564,66 @@
   </div>
 </div>
 
+<!-- ===================== PART DETAILS MODAL ===================== -->
+<div id="part-details-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"
+     class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-900/60 p-4 opacity-0 backdrop-blur-sm transition-opacity duration-300">
+  <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+    <div class="mb-4 flex items-start justify-between">
+      <div>
+        <h3 id="modal-title" class="text-lg font-bold text-slate-900 dark:text-white">Part / Job Details</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Production history & metrics for <span id="modal-part-machine" class="font-bold text-blue-500"></span></p>
+      </div>
+      <button id="modalCloseBtn" type="button" onclick="closePartModal()" aria-label="Close"
+              class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white">
+        <i class="fa-solid fa-xmark text-xl"></i>
+      </button>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="rounded-xl bg-slate-50 p-4 dark:bg-slate-700/50">
+        <p class="text-xs font-semibold uppercase text-slate-500">Job No</p>
+        <p id="modal-part-job" class="mt-1 break-all text-lg font-bold text-slate-900 dark:text-white">—</p>
+      </div>
+      <div class="rounded-xl bg-slate-50 p-4 dark:bg-slate-700/50">
+        <p class="text-xs font-semibold uppercase text-slate-500">Part No</p>
+        <p id="modal-part-no" class="mt-1 break-all text-lg font-bold text-slate-900 dark:text-white">—</p>
+      </div>
+    </div>
+    <div class="mt-4 grid grid-cols-3 gap-4">
+      <div class="rounded-xl border border-blue-100 bg-blue-50 p-3 text-center dark:border-blue-900/30 dark:bg-blue-900/20">
+        <p class="text-xs font-medium text-blue-600 dark:text-blue-400">Produced</p>
+        <p id="modal-part-produced" class="mt-1 font-bold text-slate-900 dark:text-white">0</p>
+      </div>
+      <div class="rounded-xl border border-red-100 bg-red-50 p-3 text-center dark:border-red-900/30 dark:bg-red-900/20">
+        <p class="text-xs font-medium text-red-600 dark:text-red-400">Defect Rate</p>
+        <p id="modal-part-defect" class="mt-1 font-bold text-slate-900 dark:text-white">0%</p>
+      </div>
+      <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-center dark:border-emerald-900/30 dark:bg-emerald-900/20">
+        <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Avg OEE</p>
+        <p id="modal-part-oee" class="mt-1 font-bold text-slate-900 dark:text-white">0%</p>
+      </div>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-4">
+      <div class="rounded-xl border border-violet-100 bg-violet-50 p-3 text-center dark:border-violet-900/30 dark:bg-violet-900/20">
+        <p class="text-xs font-medium text-violet-600 dark:text-violet-400">Setup Time</p>
+        <p id="modal-part-setup" class="mt-1 font-bold text-slate-900 dark:text-white">0 min</p>
+      </div>
+      <div class="rounded-xl border border-amber-100 bg-amber-50 p-3 text-center dark:border-amber-900/30 dark:bg-amber-900/20">
+        <p class="text-xs font-medium text-amber-600 dark:text-amber-400">QC / First Lot</p>
+        <p id="modal-part-qc" class="mt-1 font-bold text-slate-900 dark:text-white">0 min</p>
+      </div>
+    </div>
+    <div class="mt-6">
+      <p class="mb-2 text-xs font-semibold uppercase text-slate-500">Activity & Timeline</p>
+      <div class="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-800">
+        <i class="fa-solid fa-timeline mb-2 text-3xl opacity-50"></i>
+        <p>Production timeline & detailed logs for this Job.<br>Use Export function to download full history data.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
-<div id="toast-root" class="pointer-events-none fixed bottom-6 right-6 z-[110] flex flex-col gap-2"></div>
+<div id="toast-root" class="pointer-events-none fixed bottom-6 right-6 z-[130] flex flex-col gap-2"></div>
 
 <script>
 'use strict';
@@ -499,7 +638,8 @@ const round2 = (v) => Math.round(num(v) * 100) / 100;
 const fmt = (n, d = 0) => num(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // วันที่ตามเวลาท้องถิ่น (toISOString() เป็น UTC จะได้วันผิดช่วง 00:00–07:00 ในไทย)
-const todayISO = () => { const n = new Date(); return new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const localISO = (dt) => new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const todayISO = () => localISO(new Date());
 const shortDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
 // สุ่มแบบกำหนด seed — ข้อมูลจำลองจะคงที่ ไม่กระโดดทุกครั้งที่ render
@@ -563,7 +703,6 @@ const TONE = {
 /* =========================================================
  * 2) CONFIG & CONSTANTS
  * ========================================================= */
-// ใส่ IP จริงของแต่ละเครื่อง (หรือตั้งค่าผ่านหน้า Preferences ได้)
 const DEFAULT_SETTINGS = Object.freeze({
   apiUrls: [
     'http://***.***.*.**:****', // PH1
@@ -582,12 +721,11 @@ const DEFAULT_SETTINGS = Object.freeze({
   targetOee: 85,
 });
 
-// Endpoint ของ API (แก้ให้ตรงกับระบบจริงได้)
 const API_PATHS = {
-  live:     '/api/dashboard/live',      // ข้อมูลสด (จำเป็น)
-  products: '/api/dashboard/products',  // ?days=1|7|30  (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
-  pareto:   '/api/dashboard/pareto',    // ?days=1|7|30  (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
-  summary:  '/api/dashboard/summary',   // ?date=YYYY-MM-DD (ถ้าไม่มี จะใช้ข้อมูลจำลอง)
+  live:     '/api/dashboard/live',
+  products: '/api/dashboard/products',
+  pareto:   '/api/dashboard/pareto',
+  summary:  '/api/dashboard/summary',
 };
 const FETCH_TIMEOUT_MS = 2500;
 const RANGE_CACHE_MS = 60000;
@@ -595,7 +733,7 @@ const RANGE_CACHE_MS = 60000;
 const SETTINGS_KEY = 'tfc-oee-settings';
 const AUTH_KEY = 'tfc-oee-user';
 
-// ⚠️ บัญชีจำลองสำหรับช่วงพัฒนาเท่านั้น — ระบบจริงต้องตรวจสอบสิทธิ์ที่ฝั่ง Server/API
+// ⚠️ สำหรับ Demo เท่านั้น — ใช้งานจริงควรตรวจสอบสิทธิ์ที่ฝั่ง Server
 const DEMO_USERS = { admin: '1234', user: '1234' };
 
 const ASSET_PATHS = {
@@ -604,12 +742,7 @@ const ASSET_PATHS = {
   fontBold:    ['assets/fonts/Sarabun-Bold.ttf',    'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf'],
 };
 
-const BRAND = {
-  navy: [11, 35, 64],
-  sky: [14, 165, 233],
-  slate: [51, 65, 85],
-  company: 'Techno Foam Co., Ltd.',
-};
+const BRAND = { navy: [11, 35, 64], sky: [14, 165, 233], slate: [51, 65, 85], company: 'Techno Foam Co., Ltd.' };
 
 const DEMO_MACHINES = ['PH1', 'PH2', 'PH3', 'PH4', 'PH5', 'PH6', 'PH7', 'PH8', 'PH9', 'PH10', 'PH11'];
 const DOWNTIME_REASONS = ['Sensor Error', 'Material Jam', 'Tool Wear', 'Wait Operator', 'Power Dip', 'Mold Change', 'Quality Check'];
@@ -637,17 +770,43 @@ const KPI_DEFS = [
 
 const STATUS_MAP = {
   run:     { label: 'RUNNING',   icon: 'fa-play',                 text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500', border: 'border-l-emerald-500', pulse: true },
+  setup:   { label: 'SETUP',     icon: 'fa-screwdriver-wrench',   text: 'text-violet-700 dark:text-violet-300',   dot: 'bg-violet-500',  border: 'border-l-violet-500' },
+  qc:      { label: 'QC CHECK',  icon: 'fa-clipboard-check',      text: 'text-amber-700 dark:text-amber-300',     dot: 'bg-amber-500',   border: 'border-l-amber-500' },
   down:    { label: 'BREAKDOWN', icon: 'fa-triangle-exclamation', text: 'text-red-700 dark:text-red-300',         dot: 'bg-red-500',     border: 'border-l-red-500' },
   idle:    { label: 'WAIT/IDLE', icon: 'fa-pause',                text: 'text-slate-600 dark:text-slate-300',     dot: 'bg-slate-400',   border: 'border-l-slate-400' },
   offline: { label: 'OFFLINE',   icon: 'fa-plug-circle-xmark',    text: 'text-slate-400 dark:text-slate-500',     dot: 'bg-slate-300',   border: 'border-l-slate-300' },
 };
-const STATUS_PDF_COLOR = { RUNNING: [5, 150, 105], BREAKDOWN: [220, 38, 38], 'WAIT/IDLE': [100, 116, 139], OFFLINE: [148, 163, 184] };
+const STATUS_PDF_COLOR = { RUNNING: [5, 150, 105], SETUP: [124, 91, 181], 'QC CHECK': [217, 148, 26], BREAKDOWN: [220, 38, 38], 'WAIT/IDLE': [100, 116, 139], OFFLINE: [148, 163, 184] };
 
+// สีสถานะชุดเดียว ใช้ร่วมกันทั้ง Donut, Timeline และตาราง
+const PALETTE = { run: '#10b981', down: '#ef4444', idle: '#94a3b8', setup: '#7c5bb5', qc: '#d9941a', break: '#8b95a6' };
+
+// Time Distribution (5 สถานะ) — ลำดับนี้ต้องตรงกับ time_distribution จาก API
 const TIME_DIST = [
-  { label: 'Run Time',  color: '#10b981' },
-  { label: 'Down',      color: '#ef4444' },
-  { label: 'Idle/Wait', color: '#94a3b8' },
+  { key: 'run',   label: 'Run Time',  color: PALETTE.run },
+  { key: 'down',  label: 'Down',      color: PALETTE.down },
+  { key: 'idle',  label: 'Idle/Wait', color: PALETTE.idle },
+  { key: 'setup', label: 'Setup',     color: PALETTE.setup },
+  { key: 'qc',    label: 'QC',        color: PALETTE.qc },
 ];
+const TIME_BUCKET = Object.fromEntries(TIME_DIST.map((t, i) => [t.key, i])); // { run: 0, down: 1, ... }
+
+// แปลง machine_state จาก API → สถานะภายในระบบ
+const API_STATE = { prod: 'run', run: 'run', downtime: 'down', down: 'down', setup: 'setup', qc: 'qc', idle: 'idle', wait: 'idle' };
+const MOCK_STATES = ['run', 'run', 'run', 'run', 'idle', 'down', 'setup', 'qc'];
+
+// Timeline
+const TL_TYPES = {
+  setup: { label: 'Setup',             short: 'Setup',    color: PALETTE.setup },
+  qc:    { label: 'First Lot / รอ QC', short: 'QC',       color: PALETTE.qc },
+  run:   { label: 'ผลิต',              short: 'ผลิต',     color: PALETTE.run },
+  down:  { label: 'หยุดเครื่อง',        short: 'หยุด',     color: PALETTE.down },
+  idle:  { label: 'รอ/ว่าง',           short: 'รอ',       color: PALETTE.idle },
+  break: { label: 'พัก',               short: 'พัก',      color: PALETTE.break },
+  next:  { label: 'งานถัดไป',          short: 'งานถัดไป', color: PALETTE.idle },
+};
+const SHIFT_START_MIN = (8 * 60) + 30;           // ต้นกะ 08:30
+const SHIFT_BREAKS = [{ start: 240, end: 300 }]; // พัก 12:30–13:30 (นาทีนับจากต้นกะ, เรียงตามเวลา)
 
 const SECTION_TITLES = {
   'overview': 'Plant Overview', 'dashboard': 'Machine Details',
@@ -655,11 +814,27 @@ const SECTION_TITLES = {
   'pareto': 'Pareto Analysis', 'settings': 'Preferences',
 };
 
+const CONN_STYLES = {
+  online:  { badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500', text: 'Online' },
+  partial: { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', dot: 'bg-amber-500', text: 'Partial' },
+  offline: {
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', dot: 'bg-red-500', text: 'Offline',
+    banner: ['border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300',
+             'fa-plug-circle-xmark', 'Lost connection to all machines. Showing last known data — retrying automatically...'],
+  },
+  demo: {
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', dot: 'bg-amber-500', text: 'Demo',
+    banner: ['border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300',
+             'fa-flask', 'Cannot reach any API — showing simulated data. Check API URLs in Preferences.'],
+  },
+};
+
 /* =========================================================
  * 3) STATE
  * ========================================================= */
 const state = {
   started: false,
+  loaded: false,          // ดึงข้อมูลรอบแรกเสร็จแล้วหรือยัง
   activeSection: 'overview',
   selectedMachine: '',
   pollTimer: null,
@@ -670,10 +845,14 @@ const state = {
   urlToName: {},
   productRange: 1,
   paretoRange: 30,
+  timelineHours: 9,
   rangeCache: {},
   summaryCache: {},
   charts: {},
-  assetsPromise: Promise.resolve(),
+  visibleProducts: [],
+  modalTimer: null,
+  exporting: false,
+  assetsPromise: null,
 };
 
 const currentMachine = () => state.machines[state.selectedMachine];
@@ -684,6 +863,7 @@ function resetConnectionState() {
   state.machineList = [];
   state.urlToName = {};
   state.everConnected = false;
+  state.loaded = false;
   state.rangeCache = {};
   state.summaryCache = {};
   state.selectedMachine = '';
@@ -717,6 +897,7 @@ function hideLogin() {
 
 function logout() {
   clearTimeout(state.pollTimer);
+  state.pollGen++;
   sessionStorage.removeItem(AUTH_KEY);
   location.reload();
 }
@@ -737,13 +918,17 @@ function createMachine(name, apiUrl = null) {
     jobNo: '-', partName: '-',
     produced: 0, target: 0,
     machineState: 'offline',
-    timeDistribution: [300 + rnd() * 100, 20 + rnd() * 40, 30 + rnd() * 60], // นาที: [run, down, idle]
-    trend: Array.from({ length: 6 }, () => 65 + rnd() * 25),             // OEE 6 วันก่อนหน้า
+    // ลำดับตาม TIME_DIST: Run, Down, Idle, Setup, QC
+    timeDistribution: [300 + rnd() * 100, 20 + rnd() * 40, 30 + rnd() * 60, 15 + rnd() * 20, 10 + rnd() * 10],
+    currentPartTimeDist: [120 + rnd() * 40, 5 + rnd() * 10, 10 + rnd() * 20, 15 + rnd() * 10, 5 + rnd() * 5],
+    trend: Array.from({ length: 6 }, () => 65 + rnd() * 25),
+    timeline: null,         // null = ใช้ Timeline จำลอง
   };
 }
 
 function mockDataTick() {
   const yy = String(new Date().getFullYear()).slice(2);
+  const addMin = settings.refreshInterval / 60;
   state.machineList.forEach(name => {
     const d = state.machines[name] || (state.machines[name] = createMachine(name));
     if (d.machineState === 'offline') {
@@ -755,11 +940,14 @@ function mockDataTick() {
       d.jobNo = `JOB-${yy}-${name}-001`;
       d.partName = `Foam Component ${name}-A`;
     }
-    if (Math.random() < 0.02) d.machineState = ['run', 'run', 'run', 'idle', 'down'][Math.floor(Math.random() * 5)];
+    if (Math.random() < 0.02) d.machineState = MOCK_STATES[Math.floor(Math.random() * MOCK_STATES.length)];
     if (d.machineState === 'run') d.produced = Math.min(d.produced + Math.floor(Math.random() * 3), d.target);
 
-    const bucket = { run: 0, down: 1, idle: 2 }[d.machineState];
-    if (bucket !== undefined) d.timeDistribution[bucket] += settings.refreshInterval / 60;
+    const bucket = TIME_BUCKET[d.machineState];   // offline = undefined → ไม่นับเวลา
+    if (bucket !== undefined) {
+      d.timeDistribution[bucket] += addMin;
+      if (d.currentPartTimeDist) d.currentPartTimeDist[bucket] += addMin;
+    }
 
     d.availability = clamp(d.availability + (Math.random() - 0.5) * 1.5, 60, 100);
     d.performance = clamp(d.performance + (Math.random() - 0.5) * 1.5, 70, 100);
@@ -776,6 +964,8 @@ function mockProducts(name, days) {
     job: `JOB-${yy}-${name}-${String(i + 1).padStart(3, '0')}`,
     part: `Foam Component ${name}-${String.fromCharCode(65 + i)}`,
     produced: Math.round((800 + rnd() * 4200) * Math.max(1, days / 2)),
+    setup: Math.round(10 + rnd() * 30),
+    qc: Math.round(5 + rnd() * 15),
     defect: round2(rnd() * 4),
     oee: round2(65 + rnd() * 30),
   }));
@@ -816,94 +1006,104 @@ function applyApiData(name, url, a) {
   d.availability = num(a.availability);
   d.performance = num(a.performance);
   d.quality = num(a.quality);
-  // ฟิลด์เสริม (ถ้า API ส่งมา)
-  if (Array.isArray(a.time_distribution) && a.time_distribution.length === 3) d.timeDistribution = a.time_distribution.map(num);
+
+  const td = a.time_distribution;
+  if (Array.isArray(td) && td.length === 5) d.timeDistribution = td.map(num);
+  else if (Array.isArray(td) && td.length === 3) d.timeDistribution = [...td.map(num), 0, 0];
+
+  const cp = a.current_part_time_dist;
+  d.currentPartTimeDist = Array.isArray(cp) && cp.length === 5 ? cp.map(num) : null;   // null = ไม่มีข้อมูล
+
   if (Array.isArray(a.oee_trend) && a.oee_trend.length) d.trend = a.oee_trend.map(num).slice(-6);
 
+  d.timeline = normalizeTimeline(a.timeline);   // null → ใช้ข้อมูลจำลองพร้อมป้าย Simulated
+
   const offline = a.is_online === false || a.is_online === 0;
-  d.machineState = offline ? 'offline'
-    : a.machine_state === 'prod' ? 'run'
-    : a.machine_state === 'downtime' ? 'down'
-    : 'idle';
+  d.machineState = offline ? 'offline' : (API_STATE[a.machine_state] || 'idle');
+}
+
+function setConnStatus(status, detail = '') {
+  const s = CONN_STYLES[status] || CONN_STYLES.offline;
+  const el = $('conn-status');
+  el.className = `inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${s.badge}`;
+  el.innerHTML = `<span class="h-2 w-2 rounded-full ${s.dot}"></span>${s.text}${detail ? ` <span class="opacity-70">${escapeHTML(detail)}</span>` : ''}`;
+
+  const banner = $('conn-banner');
+  if (s.banner) {
+    const [cls, icon, msg] = s.banner;
+    banner.className = `mb-6 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${cls}`;
+    banner.innerHTML = `<i class="fa-solid ${icon}"></i><span>${msg}</span>`;
+  } else {
+    banner.className = 'mb-6 hidden';
+    banner.innerHTML = '';
+  }
 }
 
 async function pollData() {
   const gen = ++state.pollGen;
   clearTimeout(state.pollTimer);
 
-  const urls = [...settings.apiUrls];
-  const results = await Promise.all(urls.map(async (url) => {
-    const json = await fetchJSON(`${url}${API_PATHS.live}`);
-    return { url, data: json ? (json.data ?? json) : null };
-  }));
-  if (gen !== state.pollGen) return; // มีรอบใหม่กว่าแล้ว — ทิ้งผลลัพธ์เก่า
+  try {
+    const urls = [...settings.apiUrls];
+    const results = await Promise.all(urls.map(async (url) => {
+      const json = await fetchJSON(`${url}${API_PATHS.live}`);
+      return { url, data: json ? (json.data ?? json) : null };
+    }));
+    if (gen !== state.pollGen) return;   // มี poll ใหม่กว่าแล้ว — ทิ้งผลลัพธ์นี้
 
-  const onlineCount = results.filter(r => r.data && r.data.machine_name).length;
+    const onlineCount = results.filter(r => r.data && r.data.machine_name).length;
 
-  if (onlineCount > 0) {
-    if (!state.everConnected) { state.machines = {}; state.rangeCache = {}; state.summaryCache = {}; }
-    state.everConnected = true;
-    const list = [];
-    results.forEach(({ url, data }) => {
-      if (data && data.machine_name) {
-        const name = String(data.machine_name);
-        state.urlToName[url] = name;
-        if (!list.includes(name)) list.push(name);
-        applyApiData(name, url, data);
-      } else if (state.urlToName[url]) {
-        const name = state.urlToName[url];
-        if (!list.includes(name)) list.push(name);
-        const d = state.machines[name] || (state.machines[name] = createMachine(name, url));
-        d.machineState = 'offline';
-      }
-    });
-    state.machineList = list;
-    setConnStatus(onlineCount === urls.length ? 'online' : 'partial', `${onlineCount}/${urls.length}`);
-  } else if (state.everConnected) {
-    // เคยเชื่อมได้ แต่ตอนนี้หลุดทั้งหมด — คงข้อมูลเดิมไว้ และแสดงสถานะ Offline
-    state.machineList.forEach(n => { if (state.machines[n]) state.machines[n].machineState = 'offline'; });
-    setConnStatus('offline');
-  } else {
-    if (!state.machineList.length) state.machineList = [...DEMO_MACHINES];
-    mockDataTick();
-    setConnStatus('demo');
+    if (onlineCount > 0) {
+      if (!state.everConnected) { state.machines = {}; state.rangeCache = {}; state.summaryCache = {}; }
+      state.everConnected = true;
+      const list = [];
+      results.forEach(({ url, data }) => {
+        if (data && data.machine_name) {
+          const name = String(data.machine_name);
+          state.urlToName[url] = name;
+          if (!list.includes(name)) list.push(name);
+          applyApiData(name, url, data);
+        } else if (state.urlToName[url]) {
+          const name = state.urlToName[url];
+          if (!list.includes(name)) list.push(name);
+          const d = state.machines[name] || (state.machines[name] = createMachine(name, url));
+          d.machineState = 'offline';
+        }
+      });
+      state.machineList = list;
+      setConnStatus(onlineCount === urls.length ? 'online' : 'partial', `${onlineCount}/${urls.length}`);
+    } else if (state.everConnected) {
+      state.machineList.forEach(n => { if (state.machines[n]) state.machines[n].machineState = 'offline'; });
+      setConnStatus('offline');
+    } else {
+      if (!state.machineList.length) state.machineList = [...DEMO_MACHINES];
+      mockDataTick();
+      setConnStatus('demo');
+    }
+
+    state.loaded = true;
+    updateMachineDropdown();
+    renderActiveSection();
+  } catch (err) {
+    console.error('[pollData]', err);
+  } finally {
+    // ตั้งรอบถัดไปเสมอ (ยกเว้นมี poll ใหม่กว่า หรือแท็บถูกซ่อน)
+    if (gen === state.pollGen && !document.hidden) {
+      state.pollTimer = setTimeout(pollData, settings.refreshInterval * 1000);
+    }
   }
-
-  updateMachineDropdown();
-  renderActiveSection();
-  state.pollTimer = setTimeout(pollData, settings.refreshInterval * 1000);
 }
 
 async function manualRefresh(btn) {
+  if (btn?.disabled) return;
   const icon = btn?.querySelector('i');
+  if (btn) btn.disabled = true;
   icon?.classList.add('fa-spin');
-  await pollData();
-  icon?.classList.remove('fa-spin');
-}
-
-const CONN_STYLES = {
-  online:  ['bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', 'bg-emerald-500', 'API: Connected'],
-  partial: ['bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', 'bg-amber-500', 'API: Partial'],
-  offline: ['bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400', 'bg-red-500', 'API: Offline'],
-  demo:    ['bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', 'bg-amber-500', 'Demo Mode'],
-};
-
-function setConnStatus(mode, extra = '') {
-  const [cls, dot, text] = CONN_STYLES[mode];
-  const el = $('conn-status');
-  el.className = `inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${cls}`;
-  el.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}"></span><span class="hidden sm:inline">${text}${extra ? ` (${extra})` : ''}</span>`;
-
-  const banner = $('conn-banner');
-  if (mode === 'demo') {
-    banner.className = 'mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200';
-    banner.innerHTML = '<i class="fa-solid fa-flask"></i><p><b>Demo mode:</b> Cannot reach any machine API — showing simulated data. Check the API URLs in Preferences.</p>';
-  } else if (mode === 'offline') {
-    banner.className = 'mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200';
-    banner.innerHTML = '<i class="fa-solid fa-plug-circle-xmark"></i><p><b>Connection lost:</b> All machine APIs are unreachable. Showing last known data — retrying automatically.</p>';
-  } else {
-    banner.className = 'mb-6 hidden';
-    banner.innerHTML = '';
+  try {
+    await pollData();
+  } finally {
+    icon?.classList.remove('fa-spin');
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -913,8 +1113,10 @@ function normalizeRange(kind, raw) {
     if (!Array.isArray(raw)) return null;
     return raw.map(p => ({
       job: p.job_no ?? p.job ?? '-',
-      part: p.part_name ?? p.part ?? '-',
+      part: p.part_no ?? p.part_name ?? p.part ?? '-',
       produced: num(p.produced),
+      setup: num(p.setup_min ?? p.setup),
+      qc: num(p.qc_min ?? p.qc),
       defect: num(p.defect_rate ?? p.defect),
       oee: num(p.oee),
     }));
@@ -940,6 +1142,16 @@ function getRangeData(d, kind, days) {
   if (d.apiUrl && !fresh && !c?.loading) loadRangeData(d, kind, days, key);
   if (c?.data) return { rows: c.data, mock: false };
   return { rows: kind === 'products' ? mockProducts(d.machineName, days) : mockPareto(d.machineName, days), mock: true };
+}
+
+// โหลดข้อมูลแบบรอให้เสร็จ (ใช้ตอน Export)
+async function forceLoadRangeData(d, kind, days) {
+  const key = `${d.machineName}|${kind}|${days}`;
+  const c = state.rangeCache[key];
+  if (d.apiUrl && (!c?.at || Date.now() - c.at >= RANGE_CACHE_MS || !c.data)) {
+    await loadRangeData(d, kind, days, key);
+  }
+  return getRangeData(d, kind, days);
 }
 
 function analyzePareto(list) {
@@ -969,7 +1181,7 @@ function aggregatePareto(days) {
 function getDailySummary(d, date) {
   const key = `${d.machineName}|${date}`;
   if (state.summaryCache[key]) return { ...state.summaryCache[key], mock: false };
-  if (date === todayISO()) return { produced: d.produced, oee: d.oee, downtime: d.timeDistribution[1], mock: d.isMock };
+  if (date === todayISO()) return { produced: d.produced, oee: d.oee, downtime: d.timeDistribution[TIME_BUCKET.down], mock: d.isMock };
   const rnd = seeded(key);
   return { produced: Math.round(3000 + rnd() * 6000), oee: 65 + rnd() * 25, downtime: Math.round(20 + rnd() * 120), mock: true };
 }
@@ -983,16 +1195,19 @@ async function loadDailySummary() {
 
   const btn = $('btnViewLogs');
   btn.disabled = true;
-  if (d.apiUrl) {
-    const json = await fetchJSON(`${d.apiUrl}${API_PATHS.summary}?date=${date}`);
-    const r = json ? (json.data ?? json) : null;
-    if (r && r.produced !== undefined) {
-      state.summaryCache[`${d.machineName}|${date}`] = { produced: num(r.produced), oee: num(r.oee), downtime: num(r.downtime_min ?? r.downtime) };
+  try {
+    if (d.apiUrl) {
+      const json = await fetchJSON(`${d.apiUrl}${API_PATHS.summary}?date=${encodeURIComponent(date)}`);
+      const r = json ? (json.data ?? json) : null;
+      if (r && r.produced !== undefined) {
+        state.summaryCache[`${d.machineName}|${date}`] = { produced: num(r.produced), oee: num(r.oee), downtime: num(r.downtime_min ?? r.downtime) };
+      }
     }
+    renderDailySummary(d);
+    showToast(`Loaded summary for ${d.machineName} on ${date}`, 'info');
+  } finally {
+    btn.disabled = false;
   }
-  btn.disabled = false;
-  renderDailySummary(d);
-  showToast(`Loaded summary for ${d.machineName} on ${date}`, 'info');
 }
 
 /* =========================================================
@@ -1043,7 +1258,7 @@ function buildExportRows() {
     'Machine': d.machineName,
     'Status': (STATUS_MAP[d.machineState] || STATUS_MAP.offline).label,
     'Job No': d.jobNo,
-    'Part Name': d.partName,
+    'Part No': d.partName,
     'Produced': num(d.produced),
     'Target': num(d.target),
     'OEE (%)': round2(d.oee),
@@ -1054,33 +1269,71 @@ function buildExportRows() {
 }
 
 async function exportReport(type) {
-  const rows = buildExportRows();
-  if (!rows.length) { showToast('No data to export yet', 'warn'); return; }
+  if (state.exporting) { showToast('Export in progress, please wait...', 'warn'); return; }
+  if ((type === 'csv' || type === 'excel') && !window.XLSX) { showToast('Excel library not loaded', 'error'); return; }
+  if (type === 'pdf' && !window.jspdf) { showToast('PDF library not loaded', 'error'); return; }
+
+  state.exporting = true;
+  closeSidebarMobile();
+
   try {
-    if (type === 'csv') exportCSV(rows);
-    else if (type === 'excel') exportExcel(rows);
-    else if (type === 'pdf') await generatePDF(rows);
+    const days = parseInt($('exportRange')?.value, 10) || 1;
+    const rows = buildExportRows();
+    showToast(`Fetching Job History for the last ${days} day(s)...`, 'info');
+
+    // โหลดข้อมูลทุกเครื่องพร้อมกัน (แทนการโหลดทีละเครื่อง)
+    const machines = state.machineList.map(n => state.machines[n]).filter(Boolean);
+    const perMachine = await Promise.all(machines.map(async (d) => {
+      const [{ rows: pRows }] = await Promise.all([
+        forceLoadRangeData(d, 'products', days),
+        forceLoadRangeData(d, 'pareto', days),   // เตรียมไว้สำหรับ Pareto ใน Report
+      ]);
+      return pRows.map(p => ({
+        'Machine': d.machineName, 'Job No': p.job, 'Part No': p.part,
+        'Produced': p.produced, 'Setup (min)': p.setup, 'QC (min)': p.qc,
+        'Defect (%)': p.defect, 'OEE (%)': p.oee,
+      }));
+    }));
+    const jobHistoryRows = perMachine.flat();
+
+    if (!rows.length && !jobHistoryRows.length) { showToast('No data to export yet', 'warn'); return; }
+
+    if (type === 'csv') exportCSV(jobHistoryRows, days);
+    else if (type === 'excel') exportExcel(rows, jobHistoryRows, days);
+    else if (type === 'pdf') await generatePDF(rows, jobHistoryRows, days);
   } catch (err) {
     console.error(err);
     showToast(`Export failed: ${err.message}`, 'error');
+  } finally {
+    state.exporting = false;
   }
 }
 
-function exportCSV(rows) {
-  const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(rows));
-  // ใส่ BOM เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
-  downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }), `TFC_OEE_Report_${todayISO()}.csv`);
+function exportCSV(jobHistory, days) {
+  if (!jobHistory.length) { showToast('No history data found', 'warn'); return; }
+  const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(jobHistory));
+  downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }), `TFC_Production_History_${days}d_${todayISO()}.csv`);
   showToast('Exported CSV successfully!');
 }
 
-function exportExcel(rows) {
+function exportExcel(rows, jobHistory, days) {
   const wb = XLSX.utils.book_new();
+  const autoCols = (list) => Object.keys(list[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
-  XLSX.utils.book_append_sheet(wb, ws, 'OEE Report');
+  // Sheet 1: Live Status
+  const ws1 = XLSX.utils.json_to_sheet(rows);
+  ws1['!cols'] = autoCols(rows);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Live Status');
 
-  const { rows: pRows } = analyzePareto(aggregatePareto(state.paretoRange));
+  // Sheet 2: Job History
+  if (jobHistory.length) {
+    const wsJob = XLSX.utils.json_to_sheet(jobHistory);
+    wsJob['!cols'] = autoCols(jobHistory);
+    XLSX.utils.book_append_sheet(wb, wsJob, `Job History (${days}d)`);
+  }
+
+  // Sheet 3: Pareto Analysis
+  const { rows: pRows } = analyzePareto(aggregatePareto(days));
   const ws2 = XLSX.utils.json_to_sheet(pRows.map((r, i) => ({
     'Rank': i + 1,
     'Downtime Cause': r.label,
@@ -1089,13 +1342,13 @@ function exportExcel(rows) {
     'Cumulative (%)': round2(r.cumulative),
   })));
   ws2['!cols'] = [{ wch: 8 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(wb, ws2, `Pareto ${state.paretoRange}d`);
+  XLSX.utils.book_append_sheet(wb, ws2, `Pareto (${days}d)`);
 
-  XLSX.writeFile(wb, `TFC_OEE_Report_${todayISO()}.xlsx`);
+  XLSX.writeFile(wb, `TFC_OEE_Report_${days}d_${todayISO()}.xlsx`);
   showToast('Exported Excel successfully!');
 }
 
-/* ---------- PDF assets (โลโก้ + ฟอนต์ไทย) ---------- */
+/* ---------- PDF assets (โลโก้ + ฟอนต์ไทย) — โหลดเฉพาะตอนใช้ ---------- */
 const ASSETS = { logo: null, fontRegular: null, fontBold: null };
 
 function bufferToBase64(buf) {
@@ -1131,268 +1384,127 @@ async function preloadPdfAssets() {
   }
   ASSETS.fontRegular = reg;
   ASSETS.fontBold = bold;
-  if (!logo) console.warn('[PDF] Logo not found — header will use text instead.');
-  if (!reg || !bold) console.warn('[PDF] Thai font not found — PDF will use English labels only.');
 }
 
+function ensurePdfAssets() {
+  if (!state.assetsPromise) {
+    state.assetsPromise = preloadPdfAssets().catch((e) => {
+      console.warn('PDF assets failed', e);
+      state.assetsPromise = null;   // ให้ลองใหม่ได้ในครั้งถัดไป
+    });
+  }
+  return state.assetsPromise;
+}
 
-const PDF_CHART_SIZE = { w: 800, h: 360 }; // px (CSS) — วาดจริงที่ ×2.5 = 2000×900 px
-
-
-// ตัดชื่อสาเหตุยาว ๆ เป็นหลายบรรทัดใต้แกน X
+const PDF_CHART_SIZE = { w: 800, h: 360 };
 
 function wrapLabel(text, max = 14) {
-
   const words = String(text).split(' ');
-
   const lines = [];
-
   let line = '';
-
   words.forEach(w => {
-
     const next = (line + ' ' + w).trim();
-
     if (next.length > max && line) { lines.push(line); line = w; }
-
     else line = next;
-
   });
-
   if (line) lines.push(line);
-
   return lines.length > 1 ? lines : (lines[0] || '');
-
 }
-
-
-// ระบายพื้นขาว (canvas ปกติโปร่งใส)
 
 const pdfWhiteBackground = {
-
   id: 'pdfWhiteBg',
-
   beforeDraw(chart) {
-
     const { ctx, width, height } = chart;
-
-    ctx.save();
-
-    ctx.fillStyle = '#ffffff';
-
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.restore();
-
+    ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height); ctx.restore();
   },
-
 };
-
-
-// เขียนตัวเลขบนแท่ง และ % บนเส้นสะสม
 
 const pdfParetoLabels = {
-
   id: 'pdfParetoLabels',
-
   afterDatasetsDraw(chart) {
-
     const { ctx } = chart;
-
     const F = 'Inter, "Noto Sans Thai", sans-serif';
-
     const vital = chart.$vitalCount ?? 0;
-
     ctx.save();
-
     ctx.textAlign = 'center';
 
-
-    // ตัวเลขนาทีบนแท่ง
-
     const bars = chart.getDatasetMeta(2).data;
-
     const values = chart.data.datasets[2].data;
-
     ctx.font = `600 11px ${F}`;
-
     bars.forEach((bar, i) => {
-
       const inside = (bar.base - bar.y) > 22;
-
       ctx.fillStyle = inside && i < vital ? '#ffffff' : '#334155';
-
       ctx.textBaseline = inside ? 'top' : 'bottom';
-
       ctx.fillText(fmt(values[i]), bar.x, inside ? bar.y + 5 : bar.y - 3);
-
     });
-
-
-    // % สะสมบนเส้น (มีขอบขาวให้อ่านง่ายแม้ทับแท่ง)
 
     const pts = chart.getDatasetMeta(0).data;
-
     const cum = chart.data.datasets[0].data;
-
     ctx.font = `700 10.5px ${F}`;
-
     ctx.textBaseline = 'bottom';
-
     ctx.lineWidth = 3;
-
     ctx.strokeStyle = '#ffffff';
-
     ctx.fillStyle = '#0b2340';
-
     pts.forEach((p, i) => {
-
       const t = `${num(cum[i]).toFixed(0)}%`;
-
       ctx.strokeText(t, p.x, p.y - 7);
-
       ctx.fillText(t, p.x, p.y - 7);
-
     });
-
     ctx.restore();
-
   },
-
 };
 
-
 async function buildParetoChartImage(pareto) {
-
   if (!window.Chart || !pareto.rows.length) return null;
-
   try { await document.fonts?.ready; } catch { /* ใช้ฟอนต์สำรอง */ }
-
-
   const { w: W, h: H } = PDF_CHART_SIZE;
-
   const canvas = document.createElement('canvas');
-
-  canvas.width = W;
-
-  canvas.height = H;
-
+  canvas.width = W; canvas.height = H;
   canvas.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:${H}px;pointer-events:none;`;
-
   document.body.appendChild(canvas);
 
-
   const FAMILY = 'Inter, "Noto Sans Thai", sans-serif';
-
   const TXT = '#334155', GRID = '#e2e8f0', NAVY = '#0b2340';
-
   const { rows, vitalCount } = pareto;
-
   let chart;
-
-
   try {
-
     chart = new Chart(canvas, {
-
       type: 'bar',
-
       data: {
-
         labels: rows.map(r => wrapLabel(r.label)),
-
         datasets: [
-
-          { type: 'line', label: 'Cumulative %', yAxisID: 'y1', data: rows.map(r => round2(r.cumulative)),
-
-            borderColor: NAVY, backgroundColor: NAVY, borderWidth: 2.5,
-
-            pointRadius: 4, pointBackgroundColor: '#ffffff', pointBorderWidth: 2, order: 1 },
-
-          { type: 'line', label: '80% Line', yAxisID: 'y1', data: rows.map(() => 80),
-
-            borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, order: 0 },
-
-          { type: 'bar', label: 'Downtime (min)', yAxisID: 'y', data: rows.map(r => r.value),
-
-            backgroundColor: rows.map((_, i) => (i < vitalCount ? '#ef4444' : '#cbd5e1')),
-
-            borderRadius: 4, maxBarThickness: 70, order: 2 },
-
+          { type: 'line', label: 'Cumulative %', yAxisID: 'y1', data: rows.map(r => round2(r.cumulative)), borderColor: NAVY, backgroundColor: NAVY, borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#ffffff', pointBorderWidth: 2, order: 1 },
+          { type: 'line', label: '80% Line', yAxisID: 'y1', data: rows.map(() => 80), borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, order: 0 },
+          { type: 'bar', label: 'Downtime (min)', yAxisID: 'y', data: rows.map(r => r.value), backgroundColor: rows.map((_, i) => (i < vitalCount ? '#ef4444' : '#cbd5e1')), borderRadius: 4, maxBarThickness: 70, order: 2 },
         ],
-
       },
-
       options: {
-
-        responsive: false,
-
-        animation: false,          // วาดเสร็จทันที ไม่ต้องรอ animation
-
-        devicePixelRatio: 2.5,     // ความคมชัดสำหรับพิมพ์
-
-        events: [],
-
+        responsive: false, animation: false, devicePixelRatio: 2.5, events: [],
         layout: { padding: { top: 24, right: 8, left: 4, bottom: 0 } },
-
-        plugins: {
-
-          legend: { position: 'bottom', labels: { color: TXT, boxWidth: 12, usePointStyle: true, font: { family: FAMILY, size: 12 } } },
-
-          tooltip: { enabled: false },
-
-        },
-
+        plugins: { legend: { position: 'bottom', labels: { color: TXT, boxWidth: 12, usePointStyle: true, font: { family: FAMILY, size: 12 } } }, tooltip: { enabled: false } },
         scales: {
-
-          x:  { grid: { display: false }, border: { color: GRID },
-
-                ticks: { color: TXT, autoSkip: false, maxRotation: 30, font: { family: FAMILY, size: 11 } } },
-
-          y:  { beginAtZero: true, grace: '8%', grid: { color: GRID }, border: { display: false },
-
-                ticks: { color: TXT, font: { family: FAMILY, size: 11 } },
-
-                title: { display: true, text: 'Downtime (min)', color: TXT, font: { family: FAMILY, size: 12, weight: '600' } } },
-
-          y1: { min: 0, max: 100, position: 'right', grid: { display: false }, border: { display: false },
-
-                ticks: { color: TXT, stepSize: 20, callback: (v) => `${v}%`, font: { family: FAMILY, size: 11 } } },
-
+          x:  { grid: { display: false }, border: { color: GRID }, ticks: { color: TXT, autoSkip: false, maxRotation: 30, font: { family: FAMILY, size: 11 } } },
+          y:  { beginAtZero: true, grace: '8%', grid: { color: GRID }, border: { display: false }, ticks: { color: TXT, font: { family: FAMILY, size: 11 } }, title: { display: true, text: 'Downtime (min)', color: TXT, font: { family: FAMILY, size: 12, weight: '600' } } },
+          y1: { min: 0, max: 100, position: 'right', grid: { display: false }, border: { display: false }, ticks: { color: TXT, stepSize: 20, callback: (v) => `${v}%`, font: { family: FAMILY, size: 11 } } },
         },
-
       },
-
       plugins: [pdfWhiteBackground, pdfParetoLabels],
-
     });
-
     chart.$vitalCount = vitalCount;
-
-    chart.draw();                              // วาดใหม่หลังกำหนด vitalCount
-
+    chart.draw();
     return chart.toBase64Image('image/png', 1);
-
   } catch (e) {
-
-    console.warn('[PDF] Pareto chart render failed', e);
-
+    console.warn('Pareto chart image failed', e);
     return null;
-
   } finally {
-
     chart?.destroy();
-
     canvas.remove();
-
   }
-
 }
 
-async function generatePDF(rows) {
-  if (!window.jspdf) { showToast('PDF library not loaded', 'error'); return; }
+async function generatePDF(rows, jobHistory, days) {
   showToast('Generating PDF...', 'info');
-  await state.assetsPromise;
+  await ensurePdfAssets();
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
@@ -1403,12 +1515,10 @@ async function generatePDF(rows) {
   let FONT = 'helvetica';
   if (ASSETS.fontRegular && ASSETS.fontBold) {
     try {
-      doc.addFileToVFS('Sarabun-Regular.ttf', ASSETS.fontRegular);
-      doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
-      doc.addFileToVFS('Sarabun-Bold.ttf', ASSETS.fontBold);
-      doc.addFont('Sarabun-Bold.ttf', 'Sarabun', 'bold');
+      doc.addFileToVFS('Sarabun-Regular.ttf', ASSETS.fontRegular); doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+      doc.addFileToVFS('Sarabun-Bold.ttf', ASSETS.fontBold); doc.addFont('Sarabun-Bold.ttf', 'Sarabun', 'bold');
       FONT = 'Sarabun';
-    } catch (e) { console.warn('[PDF] Font register failed', e); }
+    } catch (e) { console.warn('Thai font failed', e); }
   }
   const thai = FONT === 'Sarabun';
   const L = (en, th) => (thai ? `${en} (${th})` : en);
@@ -1417,16 +1527,11 @@ async function generatePDF(rows) {
   // --- Header ---
   doc.setFillColor(...BRAND.navy);
   doc.rect(0, 0, 210, 40, 'F');
-
   let logoDrawn = false;
-  if (ASSETS.logo) {
-    try { doc.addImage(ASSETS.logo.data, ASSETS.logo.format, 10, 9, 62, 22); logoDrawn = true; } catch (e) { console.warn(e); }
-  }
+  if (ASSETS.logo) { try { doc.addImage(ASSETS.logo.data, ASSETS.logo.format, 10, 9, 62, 22); logoDrawn = true; } catch (e) { /* ใช้ข้อความแทน */ } }
   if (!logoDrawn) {
-    doc.setFont(FONT, 'bold'); doc.setFontSize(26); doc.setTextColor(125, 211, 252);
-    doc.text('TFC', 14, 22);
-    doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225);
-    doc.text(BRAND.company, 14, 29);
+    doc.setFont(FONT, 'bold'); doc.setFontSize(26); doc.setTextColor(125, 211, 252); doc.text('TFC', 14, 22);
+    doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225); doc.text(BRAND.company, 14, 29);
   }
 
   doc.setFont(FONT, 'bold'); doc.setFontSize(16); doc.setTextColor(255, 255, 255);
@@ -1434,87 +1539,63 @@ async function generatePDF(rows) {
   doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(203, 213, 225);
   doc.text(`${L('Generated', 'วันที่ออกรายงาน')}: ${now.toLocaleString(locale)}`, 196, 24, { align: 'right' });
   doc.text(`${L('Generated By', 'ผู้ออกรายงาน')}: ${currentUser()}`, 196, 29, { align: 'right' });
-  doc.text(`Source: ${state.everConnected ? 'Live API' : 'Demo / Simulated data'}`, 196, 34, { align: 'right' });
 
-  doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.8);
-  doc.line(0, 40, 210, 40);
+  doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.8); doc.line(0, 40, 210, 40);
 
-  // --- คำนวณตัวชี้วัด ---
   const activeRows = rows.filter(r => r.Status !== 'OFFLINE');
   const base = activeRows.length ? activeRows : rows;
   const avg = (key) => base.length ? base.reduce((s, r) => s + r[key], 0) / base.length : 0;
   const avgOee = avg('OEE (%)');
   const totalProd = rows.reduce((s, r) => s + r.Produced, 0);
-  const runningCount = rows.filter(r => r.Status === 'RUNNING').length;
-  const downToday = state.machineList.reduce((s, n) => s + num(state.machines[n]?.timeDistribution?.[1]), 0);
 
-  // --- KPI boxes ---
   const kpis = [
-    { label: 'Average OEE',      value: `${avgOee.toFixed(1)}%`,             color: avgOee >= target ? [16, 185, 129] : [245, 158, 11] },
-    { label: 'Total Produced',   value: `${fmt(totalProd)} pcs`,             color: BRAND.sky },
-    { label: 'Running Machines', value: `${runningCount} / ${rows.length}`,  color: [59, 130, 246] },
-    { label: 'Downtime Today',   value: `${fmt(downToday)} min`,             color: [239, 68, 68] },
+    { label: 'Average OEE', value: `${avgOee.toFixed(1)}%`, color: avgOee >= target ? [16, 185, 129] : [245, 158, 11] },
+    { label: 'Total Produced', value: `${fmt(totalProd)} pcs`, color: BRAND.sky },
+    { label: 'Running Machines', value: `${rows.filter(r => r.Status === 'RUNNING').length} / ${rows.length}`, color: [59, 130, 246] },
+    { label: 'Downtime Today', value: `${fmt(state.machineList.reduce((s, n) => s + num(state.machines[n]?.timeDistribution?.[TIME_BUCKET.down]), 0))} min`, color: [239, 68, 68] },
   ];
-  const gap = 3.5, boxW = (182 - gap * 3) / 4, boxY = 48;
   kpis.forEach((k, i) => {
-    const x = 14 + i * (boxW + gap);
-    doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
-    doc.roundedRect(x, boxY, boxW, 20, 2, 2, 'FD');
-    doc.setFillColor(...k.color);
-    doc.rect(x, boxY + 3, 1.2, 14, 'F');
-    doc.setFont(FONT, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-    doc.text(k.label, x + 4, boxY + 7);
-    doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy);
-    doc.text(k.value, x + 4, boxY + 15);
+    const x = 14 + i * ((182 - 3.5 * 3) / 4 + 3.5);
+    doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2); doc.roundedRect(x, 48, 42, 20, 2, 2, 'FD');
+    doc.setFillColor(...k.color); doc.rect(x, 51, 1.2, 14, 'F');
+    doc.setFont(FONT, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139); doc.text(k.label, x + 4, 55);
+    doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy); doc.text(k.value, x + 4, 63);
   });
 
-  const heading = (text, y) => {
-    doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy);
-    doc.text(text, 14, y);
-    doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.6);
-    doc.line(14, y + 2, 40, y + 2);
-  };
-  const subText = (text, y) => {
-    doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(...BRAND.slate);
-    doc.text(text, 14, y);
-  };
+  const heading = (text, y) => { doc.setFont(FONT, 'bold'); doc.setFontSize(13); doc.setTextColor(...BRAND.navy); doc.text(text, 14, y); doc.setDrawColor(...BRAND.sky); doc.setLineWidth(0.6); doc.line(14, y + 2, 40, y + 2); };
+  const subText = (text, y) => { doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(...BRAND.slate); doc.text(text, 14, y); };
   const ensureSpace = (y, need) => (y + need > 272 ? (doc.addPage(), 20) : y);
-  const tableBase = {
-    theme: 'grid',
-    margin: { left: 14, right: 14 },
-    styles: { font: FONT, fontSize: 8, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [51, 65, 85] },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-  };
+  const tableBase = { theme: 'grid', margin: { left: 14, right: 14 }, styles: { font: FONT, fontSize: 8, cellPadding: 2, lineColor: [226, 232, 240], lineWidth: 0.1, textColor: [51, 65, 85] }, alternateRowStyles: { fillColor: [248, 250, 252] } };
 
-  // --- SECTION 1: Daily Summary ---
+  // --- SECTION 1: Live Production Summary ---
   let y = 80;
-  heading(L('1. Daily Production Summary', 'สรุปผลการผลิตรายวัน'), y);
+  heading(L('1. Live Production Summary', 'สรุปสถานะการผลิตปัจจุบัน'), y);
   subText(`${L('Date', 'วันที่')}: ${now.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}   |   Target OEE: ${target}%`, y + 8);
 
   doc.autoTable({
-    ...tableBase,
-    startY: y + 11,
+    ...tableBase, startY: y + 11,
     head: [['Machine', 'Status', 'Job No', 'Produced', 'Target', 'OEE %', 'Avail %', 'Perf %', 'Qual %']],
-    body: rows.map(r => [r.Machine, r.Status, r['Job No'], fmt(r.Produced), fmt(r.Target),
-      r['OEE (%)'].toFixed(1), r['Availability (%)'].toFixed(1), r['Performance (%)'].toFixed(1), r['Quality (%)'].toFixed(1)]),
+    body: rows.map(r => [r.Machine, r.Status, r['Job No'], fmt(r.Produced), fmt(r.Target), r['OEE (%)'].toFixed(1), r['Availability (%)'].toFixed(1), r['Performance (%)'].toFixed(1), r['Quality (%)'].toFixed(1)]),
     headStyles: { fillColor: BRAND.navy, textColor: 255, fontStyle: 'bold' },
     columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
     didParseCell: (h) => {
-      if (h.section !== 'body') return;
-      if (h.column.index === 1) h.cell.styles.textColor = STATUS_PDF_COLOR[h.cell.raw] || [100, 116, 139];
-      if (h.column.index === 5) h.cell.styles.textColor = parseFloat(h.cell.raw) >= target ? [5, 150, 105] : [217, 119, 6];
+      if (h.section === 'body') {
+        if (h.column.index === 1) h.cell.styles.textColor = STATUS_PDF_COLOR[h.cell.raw] || [100, 116, 139];
+        if (h.column.index === 5) h.cell.styles.textColor = parseFloat(h.cell.raw) >= target ? [5, 150, 105] : [217, 119, 6];
+      }
     },
   });
 
-  // --- SECTION 2: Monthly / Yearly Projection ---
+  // --- SECTION 2: KPI Assessment & Projection ---
   y = ensureSpace(doc.lastAutoTable.finalY + 14, 55);
-  heading(L('2. Monthly & Yearly Projection', 'แนวโน้มรายเดือนและรายปี'), y);
+  heading(L('2. KPI Assessment & Projection', 'ประเมิน KPI และประมาณการ'), y);
   subText(`${L('Month', 'เดือน')}: ${now.toLocaleString(locale, { month: 'long', year: 'numeric' })}   |   Est. monthly (22 days): ${fmt(totalProd * 22)} pcs   |   Est. yearly (260 days): ${fmt(totalProd * 260)} pcs`, y + 8);
+  doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
+  doc.text("* Projection is based on today's output so far (not a full-day average).", 14, y + 12.5);
 
   const avgMap = { oee: avgOee, availability: avg('Availability (%)'), performance: avg('Performance (%)'), quality: avg('Quality (%)') };
   doc.autoTable({
-    ...tableBase,
-    startY: y + 11,
+    ...tableBase, startY: y + 15,
     head: [['Metric', 'Target', 'Current Average', 'Gap', 'Assessment']],
     body: KPI_DEFS.map(k => {
       const t = k.target(), v = avgMap[k.key], gapPt = v - t;
@@ -1524,79 +1605,77 @@ async function generatePDF(rows) {
     headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
     didParseCell: (h) => {
-      if (h.section !== 'body' || h.column.index !== 4) return;
-      h.cell.styles.fontStyle = 'bold';
-      h.cell.styles.textColor = h.cell.raw === 'PASSED' ? [5, 150, 105] : h.cell.raw === 'MONITORING' ? [217, 119, 6] : [220, 38, 38];
+      if (h.section === 'body' && h.column.index === 4) {
+        h.cell.styles.fontStyle = 'bold';
+        h.cell.styles.textColor = h.cell.raw === 'PASSED' ? [5, 150, 105] : h.cell.raw === 'MONITORING' ? [217, 119, 6] : [220, 38, 38];
+      }
     },
   });
 
-  // --- SECTION 3: Downtime Pareto (all machines) + กราฟ ---
-  const pareto = analyzePareto(aggregatePareto(state.paretoRange));
-  const IMG_W = 178;                                            // mm
-  const IMG_H = IMG_W * PDF_CHART_SIZE.h / PDF_CHART_SIZE.w;    // ≈ 80 mm (รักษาอัตราส่วน)
+  // --- SECTION 3: Downtime Pareto ---
+  const pareto = analyzePareto(aggregatePareto(days));
+  const IMG_W = 178;
+  const IMG_H = IMG_W * PDF_CHART_SIZE.h / PDF_CHART_SIZE.w;
   const chartImg = await buildParetoChartImage(pareto);
   const chartBlock = chartImg ? IMG_H + 16 : 0;
 
-  // ให้หัวข้อ + กราฟ + หัวตารางอยู่หน้าเดียวกัน
   y = ensureSpace(doc.lastAutoTable.finalY + 14, 11 + chartBlock + 30);
   heading(L('3. Downtime Pareto - All Machines', 'สาเหตุการหยุดเครื่องหลัก'), y);
-  subText(`Range: Last ${state.paretoRange} day(s)   |   Total downtime: ${fmt(pareto.total)} min (${fmt(pareto.total / 60, 1)} hrs)   |   Vital few: ${pareto.vitalCount} cause(s)`, y + 8);
+  subText(`Range: Last ${days} day(s)   |   Total downtime: ${fmt(pareto.total)} min (${fmt(pareto.total / 60, 1)} hrs)   |   Vital few: ${pareto.vitalCount} cause(s)`, y + 8);
 
   let tableY = y + 11;
   if (chartImg) {
     const boxY = y + 12;
-    // กรอบการ์ดรอบกราฟ
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(14, boxY, 182, IMG_H + 4, 2, 2, 'FD');
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2); doc.roundedRect(14, boxY, 182, IMG_H + 4, 2, 2, 'FD');
     doc.addImage(chartImg, 'PNG', 16, boxY + 2, IMG_W, IMG_H, 'pareto-all', 'FAST');
-
-    // คำอธิบายใต้กราฟ
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Red bars = vital few causes (~80% of total downtime)   |   Navy line = cumulative %   |   Dashed line = 80% threshold', 14, boxY + IMG_H + 9);
-
+    doc.setFont(FONT, 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
+    doc.text('Red bars = vital few causes (~80% of total downtime)   |   Navy line = cumulative %', 14, boxY + IMG_H + 9);
     tableY = boxY + IMG_H + 12;
-  } else if (pareto.rows.length) {
-    console.warn('[PDF] Pareto chart skipped — table only.');
   }
 
   doc.autoTable({
-    ...tableBase,
-    startY: tableY,
+    ...tableBase, startY: tableY,
     head: [['Rank', 'Downtime Cause', 'Lost Time (min)', 'Share %', 'Cumulative %', 'Impact']],
-    body: pareto.rows.map((r, i) => [
-      i + 1, r.label, fmt(r.value), r.share.toFixed(1), r.cumulative.toFixed(1),
-      i < pareto.vitalCount ? 'HIGH' : r.share >= 5 ? 'MEDIUM' : 'LOW',
-    ]),
+    body: pareto.rows.map((r, i) => [i + 1, r.label, fmt(r.value), r.share.toFixed(1), r.cumulative.toFixed(1), i < pareto.vitalCount ? 'HIGH' : r.share >= 5 ? 'MEDIUM' : 'LOW']),
     headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
     columnStyles: { 0: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'center' } },
     didParseCell: (h) => {
-      if (h.section !== 'body' || h.column.index !== 5) return;
-      h.cell.styles.fontStyle = 'bold';
-      h.cell.styles.textColor = h.cell.raw === 'HIGH' ? [220, 38, 38] : h.cell.raw === 'MEDIUM' ? [217, 119, 6] : [100, 116, 139];
+      if (h.section === 'body' && h.column.index === 5) {
+        h.cell.styles.fontStyle = 'bold';
+        h.cell.styles.textColor = h.cell.raw === 'HIGH' ? [220, 38, 38] : h.cell.raw === 'MEDIUM' ? [217, 119, 6] : [100, 116, 139];
+      }
     },
   });
 
-  // --- Footer ทุกหน้า ---
+  // --- SECTION 4: Production History ---
+  if (jobHistory.length) {
+    y = ensureSpace(doc.lastAutoTable.finalY + 14, 40);
+    heading(L(`4. Production History (${days} Days)`, `ประวัติการผลิต (${days} วัน)`), y);
+    doc.autoTable({
+      ...tableBase, startY: y + 6,
+      head: [['Machine', 'Job No', 'Part No', 'Produced', 'Setup (m)', 'QC (m)', 'Defect %', 'OEE %']],
+      body: jobHistory.map(r => [r['Machine'], r['Job No'], r['Part No'], fmt(r['Produced']), fmt(r['Setup (min)']), fmt(r['QC (min)']), num(r['Defect (%)']).toFixed(1), num(r['OEE (%)']).toFixed(1)]),
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+      columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } },
+    });
+  }
+
+  // --- Footer ---
   const pages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2);
-    doc.line(14, 284, 196, 284);
+    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2); doc.line(14, 284, 196, 284);
     doc.setFont(FONT, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
     doc.text(`${BRAND.company} - OEE Plant System`, 14, 289);
     doc.text(`Page ${i} of ${pages}`, 196, 289, { align: 'right' });
   }
 
-  doc.save(`TFC_OEE_Executive_Report_${todayISO()}.pdf`);
+  doc.save(`TFC_OEE_Report_${days}d_${todayISO()}.pdf`);
   showToast(thai ? 'Exported PDF successfully!' : 'Exported PDF (English only — Thai font not found)', thai ? 'success' : 'warn');
 }
 
 /* =========================================================
- * 9) NAVIGATION
+ * 9) NAVIGATION & MODAL
  * ========================================================= */
 function closeSidebarMobile() {
   if (window.innerWidth < 768) {
@@ -1608,16 +1687,13 @@ function closeSidebarMobile() {
 function showSection(name) {
   if (!SECTION_TITLES[name]) name = 'overview';
   state.activeSection = name;
-
   document.querySelectorAll('.page-section').forEach(s => s.classList.toggle('is-active', s.id === `section-${name}`));
   document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('is-active', btn.dataset.section === name));
   $('page-title').textContent = SECTION_TITLES[name];
-
   const showSelect = !['overview', 'settings'].includes(name);
   $('globalMachineSelect').classList.toggle('hidden', !showSelect);
   if (showSelect && state.selectedMachine) $('globalMachineSelect').value = state.selectedMachine;
   if (name === 'settings') fillSettingsForm();
-
   closeSidebarMobile();
   renderActiveSection();
 }
@@ -1636,10 +1712,39 @@ function jumpToMachine(name) {
   showSection('dashboard');
 }
 
+function viewPartDetails(p, machineName) {
+  $('modal-part-machine').textContent = machineName;
+  $('modal-part-job').textContent = p.job;
+  $('modal-part-no').textContent = p.part;
+  $('modal-part-produced').textContent = fmt(p.produced);
+  $('modal-part-defect').textContent = `${fmt(p.defect, 1)}%`;
+  $('modal-part-oee').textContent = `${fmt(p.oee, 1)}%`;
+  $('modal-part-setup').textContent = `${fmt(p.setup)} min`;
+  $('modal-part-qc').textContent = `${fmt(p.qc)} min`;
+
+  const modal = $('part-details-modal');
+  clearTimeout(state.modalTimer);
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  void modal.offsetWidth;                 // บังคับ reflow ให้ transition ทำงาน
+  modal.classList.remove('opacity-0');
+  $('modalCloseBtn').focus();
+}
+
+function closePartModal() {
+  const modal = $('part-details-modal');
+  if (modal.classList.contains('hidden')) return;
+  modal.classList.add('opacity-0');
+  clearTimeout(state.modalTimer);
+  state.modalTimer = setTimeout(() => {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }, 300);
+}
+
 function renderActiveSection() {
   const d = currentMachine();
   if (d) ['lbl-product-machine', 'lbl-summary-machine', 'lbl-pareto-machine'].forEach(id => { $(id).textContent = d.machineName; });
-
   switch (state.activeSection) {
     case 'overview':      renderOverview(); break;
     case 'dashboard':     if (d) renderMachineDetail(d); break;
@@ -1654,6 +1759,14 @@ function renderActiveSection() {
  * ========================================================= */
 function renderOverview() {
   const list = state.machineList.map(n => state.machines[n]).filter(Boolean);
+
+  // ยังดึงข้อมูลรอบแรกไม่เสร็จ — คงสถานะ Loading ไว้
+  if (!list.length && !state.loaded) {
+    $('overview-stats').innerHTML = '';
+    $('overview-grid').innerHTML = '<div class="card col-span-full py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading machines...</div>';
+    return;
+  }
+
   const target = settings.targetOee;
   const active = list.filter(d => d.machineState !== 'offline');
   const avgOee = active.length ? active.reduce((s, d) => s + num(d.oee), 0) / active.length : 0;
@@ -1662,7 +1775,7 @@ function renderOverview() {
   $('overview-stats').innerHTML = [
     { label: 'Plant Avg OEE',  value: `${fmt(avgOee, 1)}%`, sub: `Target ${target}%`, icon: 'fa-chart-pie', tone: avgOee >= target ? TONE.emerald : TONE.amber },
     { label: 'Running',        value: `${count('run')} / ${list.length}`, sub: 'machines', icon: 'fa-play', tone: TONE.emerald },
-    { label: 'Breakdown',      value: count('down'), sub: `Idle ${count('idle')} | Offline ${count('offline')}`, icon: 'fa-triangle-exclamation', tone: TONE.red },
+    { label: 'Breakdown',      value: count('down'), sub: `Idle ${count('idle')} | Setup/QC ${count('setup') + count('qc')} | Offline ${count('offline')}`, icon: 'fa-triangle-exclamation', tone: TONE.red },
     { label: 'Total Produced', value: fmt(list.reduce((s, d) => s + num(d.produced), 0)), sub: 'pcs today', icon: 'fa-boxes-stacked', tone: TONE.blue },
   ].map(statCard).join('');
 
@@ -1700,13 +1813,213 @@ function renderOverview() {
 function last7Labels() {
   return Array.from({ length: 7 }, (_, i) => {
     if (i === 6) return 'Today';
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return shortDate(d);
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return shortDate(d);
   });
 }
 
+/* ---------- Timeline: แผนเทียบการผลิตจริง ---------- */
+// นาทีที่ผ่านไปนับจากต้นกะ (0–1439)
+const nowShiftMin = () => { const n = new Date(); return (n.getHours() * 60 + n.getMinutes() - SHIFT_START_MIN + 1440) % 1440; };
+// วันที่ของกะ (ก่อน 08:00 ยังนับเป็นกะของเมื่อวาน)
+const shiftDateISO = () => localISO(new Date(Date.now() - SHIFT_START_MIN * 60000));
+// นาทีจากต้นกะ → "HH:MM"
+const shiftClock = (off) => {
+  const m = (((SHIFT_START_MIN + Math.round(off)) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+
+// รับ "HH:MM", ISO datetime หรือตัวเลข (นาทีจากต้นกะ) → นาทีนับจากต้นกะ
+function toShiftMin(v) {
+  if (v === null || v === undefined || v === '') return NaN;
+  if (typeof v === 'number') return v;
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(String(v).trim());
+  let m;
+  if (hm) m = Number(hm[1]) * 60 + Number(hm[2]);
+  else {
+    const dt = new Date(v);
+    if (Number.isNaN(dt.getTime())) return NaN;
+    m = dt.getHours() * 60 + dt.getMinutes();
+  }
+  return (m - SHIFT_START_MIN + 1440) % 1440;
+}
+
+function mergeBlocks(blocks) {
+  return blocks.reduce((out, b) => {
+    const last = out[out.length - 1];
+    if (last && last.type === b.type && last.end === b.start && !!last.forecast === !!b.forecast) last.end = b.end;
+    else out.push({ ...b });
+    return out;
+  }, []);
+}
+
+// วางกิจกรรมต่อกันตามลำดับ และแทรกช่วงพักให้อัตโนมัติ
+function layoutSegments(segments, from = 0) {
+  const blocks = [];
+  let t = from;
+  for (const seg of segments) {
+    let remain = seg.dur;
+    while (remain > 0) {
+      const inBreak = SHIFT_BREAKS.find(b => t >= b.start && t < b.end);
+      if (inBreak) { blocks.push({ type: 'break', start: t, end: inBreak.end }); t = inBreak.end; continue; }
+      const nextBreak = SHIFT_BREAKS.find(b => b.start > t);
+      const end = Math.min(t + remain, nextBreak ? nextBreak.start : Infinity);
+      blocks.push({ type: seg.type, start: t, end });
+      remain -= end - t;
+      t = end;
+    }
+  }
+  return { blocks: mergeBlocks(blocks), end: t };
+}
+
+// ข้อมูลจำลอง: คงที่ต่อเครื่องต่อกะ และตัดตามเวลาปัจจุบันจริง
+function mockTimeline(d, nowOff) {
+  const rnd = seeded(`${d.machineName}|timeline|${shiftDateISO()}`);
+  const setup = Math.round(30 + rnd() * 15);
+  const qc = Math.round(25 + rnd() * 20);
+  const runPlan = Math.round(360 + rnd() * 90);
+
+  const plan = layoutSegments([{ type: 'setup', dur: setup }, { type: 'qc', dur: qc }, { type: 'run', dur: runPlan }]);
+  plan.blocks.push({ type: 'next', start: plan.end, end: plan.end + 120 });
+
+  const runBeforeDown = Math.round(60 + rnd() * 90);
+  const full = layoutSegments([
+    { type: 'setup', dur: setup + Math.round(rnd() * 10) },
+    { type: 'qc',    dur: Math.max(10, qc + Math.round(rnd() * 16) - 8) },
+    { type: 'run',   dur: runBeforeDown },
+    { type: 'down',  dur: Math.round(10 + rnd() * 20) },
+    { type: 'run',   dur: runPlan - runBeforeDown },
+  ]);
+
+  // ก่อนเวลาปัจจุบัน = เกิดขึ้นจริง / หลังจากนั้น = คาดการณ์ (ไม่คาดการณ์ว่าเครื่องจะเสีย)
+  const actual = [], remaining = [];
+  full.blocks.forEach(b => {
+    if (b.end <= nowOff) actual.push(b);
+    else if (b.start < nowOff) { actual.push({ ...b, end: nowOff }); remaining.push({ type: b.type, dur: b.end - nowOff }); }
+    else remaining.push({ type: b.type, dur: b.end - b.start });
+  });
+  const fc = layoutSegments(remaining.filter(s => s.type !== 'down' && s.type !== 'break'), nowOff);
+  const forecast = fc.blocks.map(b => ({ ...b, forecast: true }));
+
+  return { plan: plan.blocks, actual, forecast, planEnd: plan.end, forecastEnd: forecast.length ? fc.end : full.end };
+}
+
+// แปลงข้อมูล timeline จาก API
+function normalizeTimeline(raw) {
+  if (!raw || !Array.isArray(raw.plan) || !Array.isArray(raw.actual)) return null;
+  const norm = (list, forecast = false) => list.map(b => {
+    const start = toShiftMin(b.start);
+    let end = toShiftMin(b.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+    if (end <= start) end += 1440;   // ข้ามเที่ยงคืน
+    return { type: TL_TYPES[b.type] ? b.type : 'idle', start, end, label: b.label ? String(b.label) : '', forecast: forecast || b.forecast === true };
+  }).filter(Boolean);
+
+  const plan = norm(raw.plan);
+  const actualAll = norm(raw.actual);
+  const actual = actualAll.filter(b => !b.forecast);
+  const forecast = [...actualAll.filter(b => b.forecast), ...norm(Array.isArray(raw.forecast) ? raw.forecast : [], true)];
+  const planWork = plan.filter(b => b.type !== 'next');
+  const planEnd = planWork.length ? Math.max(...planWork.map(b => b.end)) : 0;
+  const lastEnd = Math.max(0, ...actual.map(b => b.end), ...forecast.map(b => b.end));
+  const fe = toShiftMin(raw.forecast_end);
+  return { plan, actual, forecast, planEnd, forecastEnd: Number.isFinite(fe) ? fe : lastEnd };
+}
+
+function renderTimeline(d) {
+  const section = $('timeline-section');
+  if (!d || d.machineState === 'offline') { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+
+  const hours = state.timelineHours;
+  const span = hours * 60;
+  const nowOff = nowShiftMin();
+  const isMock = !d.timeline;
+  const tl = d.timeline || mockTimeline(d, nowOff);
+  const pct = (min) => (clamp(min, 0, span) / span) * 100;
+
+  // Header
+  $('tl-machine').textContent = d.machineName;
+  $('tl-source').innerHTML = sourceBadge(isMock);
+  $('tl-subtitle').textContent = `${d.jobNo} · ${d.partName} · เป้าหมาย ${fmt(d.target)} ชิ้น`;
+  document.querySelectorAll('.tl-range-btn').forEach(btn => {
+    const on = Number(btn.dataset.hours) === hours;
+    btn.className = `tl-range-btn rounded px-3 py-1.5 text-xs font-semibold transition ${on
+      ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`;
+  });
+
+  // แกนเวลา + เส้น grid (วางไว้ใน track เพื่อไม่ให้พื้นหลังทับ)
+  const step = hours <= 12 ? 1 : 2;
+  const ticks = [];
+  for (let h = 0; h <= hours; h += step) ticks.push(h);
+  $('tl-axis').innerHTML = ticks.map(h =>
+    `<span class="absolute top-0 -translate-x-1/2 tabular-nums" style="left:${pct(h * 60)}%">${shiftClock(h * 60)}</span>`).join('');
+  const grid = ticks.slice(1, -1).map(h =>
+    `<div class="absolute inset-y-0 w-px bg-slate-200/80 dark:bg-slate-700/60" style="left:${pct(h * 60)}%"></div>`).join('');
+
+  const blockHTML = (b, row) => {
+    if (b.start >= span || b.end <= 0) return '';
+    const meta = TL_TYPES[b.type] || TL_TYPES.idle;
+    const left = pct(b.start), width = pct(b.end) - left;
+    if (width <= 0) return '';
+    const c = meta.color;
+    const style = row === 'plan'
+      ? (b.type === 'next' ? `border:1px dashed ${c};color:${c};` : `background:${c}33;color:${c};`)
+      : (b.forecast ? `background:${c}14;border:2px dashed ${c};color:${c};` : `background:${c};color:#fff;`);
+    const tip = `${meta.label}${b.label ? ` (${b.label})` : ''} · ${shiftClock(b.start)}–${shiftClock(b.end)} · ${fmt(b.end - b.start)} น.`;
+    const text = width >= 4 ? escapeHTML(b.label || meta.short) : '';   // บล็อกแคบไม่ต้องใส่ข้อความ
+    return `<div class="absolute inset-y-0 flex items-center justify-center overflow-hidden whitespace-nowrap px-1 text-xs font-semibold" style="left:${left}%;width:${width}%;${style}" title="${escapeHTML(tip)}">${text}</div>`;
+  };
+
+  $('tl-plan-track').innerHTML = grid + tl.plan.map(b => blockHTML(b, 'plan')).join('');
+  $('tl-actual-track').innerHTML = grid + [...tl.actual, ...tl.forecast].map(b => blockHTML(b, 'actual')).join('');
+
+  // เส้น "ขณะนี้" ใช้เวลาจริงเสมอ
+  const marker = $('tl-now');
+  if (nowOff <= span) {
+    marker.style.left = `${pct(nowOff)}%`;
+    $('tl-now-text').textContent = shiftClock(nowOff);
+    marker.classList.remove('hidden');
+  } else {
+    marker.classList.add('hidden');
+  }
+
+  // Legend: รวมเวลาจากสิ่งที่เกิดขึ้นจริง
+  const totals = {};
+  tl.actual.forEach(b => { totals[b.type] = (totals[b.type] || 0) + (b.end - b.start); });
+  $('tl-legend').innerHTML = Object.keys(TL_TYPES).filter(k => totals[k] > 0).map(k =>
+    `<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:${TL_TYPES[k].color}"></span>${TL_TYPES[k].label} ${fmt(totals[k])} น.</span>`
+  ).join('') || '<span>ยังไม่มีกิจกรรมในกะนี้</span>';
+
+  // เวลาที่คาดว่าจะเสร็จ เทียบกับแผน
+  const done = !tl.forecast.length;
+  const fin = $('tl-finish');
+  let late = false, diffText = '';
+  if (tl.planEnd > 0) {
+    const delay = Math.round(tl.forecastEnd - tl.planEnd);
+    late = delay > 5;   // คลาดเคลื่อนได้ไม่เกิน 5 นาที
+    diffText = Math.abs(delay) <= 5 ? ' · ตามแผน' : late ? ` · ช้า ${fmt(delay)} นาที` : ` · เร็วกว่าแผน ${fmt(-delay)} นาที`;
+  }
+  fin.className = `rounded border px-3 py-1.5 text-xs font-semibold ${late
+    ? 'border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400'
+    : 'border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/30 dark:text-emerald-400'}`;
+  fin.textContent = `${done ? 'ผลิตเสร็จเวลา' : 'คาดว่าจะจบ'} ${shiftClock(tl.forecastEnd)}${diffText}`;
+}
+
+// การ์ดสัดส่วนเวลา 5 สถานะ (ใช้ทั้ง Time Distribution และ Current Part Time)
+function timeCards(values) {
+  const total = values.reduce((a, b) => a + b, 0) || 1;
+  return TIME_DIST.map((t, i) => `
+    <div class="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-700/50">
+      <p class="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><span class="h-2.5 w-2.5 rounded-full" style="background:${t.color}"></span>${t.label}</p>
+      <p class="mt-1 text-base font-bold tabular-nums text-slate-900 dark:text-white">${(((values[i] || 0) / total) * 100).toFixed(0)}%</p>
+      <p class="text-[11px] text-slate-400">${fmt(values[i] || 0)} min</p>
+    </div>`).join('');
+}
+
 function renderMachineDetail(d) {
+  renderTimeline(d);
+
   const target = settings.targetOee;
   $('dash-machine-name').textContent = `Machine ${d.machineName}`;
 
@@ -1750,7 +2063,6 @@ function renderMachineDetail(d) {
   badge.className = `inline-flex items-center gap-2 rounded-full bg-white dark:bg-slate-800 px-4 py-1.5 text-sm font-bold shadow-sm ${s.text} ${s.pulse ? 'live-pulse' : ''}`;
   badge.innerHTML = `<span class="h-2.5 w-2.5 rounded-full ${s.dot}"></span><i class="fa-solid ${s.icon} text-xs"></i><span>${s.label}</span>`;
 
-  // OEE Trend (7 วัน)
   const trend = state.charts.trend;
   if (trend) {
     const data = [...d.trend.slice(-6), num(d.oee)].map(round2);
@@ -1762,24 +2074,23 @@ function renderMachineDetail(d) {
     trend.update('none');
   }
 
-  // Time distribution
   const time = state.charts.time;
   if (time) {
     time.data.datasets[0].data = d.timeDistribution.map(round2);
     time.update('none');
   }
-  const totalMin = d.timeDistribution.reduce((a, b) => a + b, 0) || 1;
-  $('time-legend').innerHTML = TIME_DIST.map((t, i) => `
-    <div class="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-700/50">
-      <p class="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><span class="h-2.5 w-2.5 rounded-full" style="background:${t.color}"></span>${t.label}</p>
-      <p class="mt-1 text-lg font-bold tabular-nums text-slate-900 dark:text-white">${((d.timeDistribution[i] / totalMin) * 100).toFixed(0)}%</p>
-      <p class="text-[11px] text-slate-400">${fmt(d.timeDistribution[i])} min</p>
-    </div>`).join('');
+  $('time-legend').innerHTML = timeCards(d.timeDistribution);
+
+  const cp = d.currentPartTimeDist;
+  $('current-part-time-legend').innerHTML = cp && cp.some(v => v > 0)
+    ? timeCards(cp)
+    : '<p class="col-span-full py-4 text-center text-xs text-slate-400">ยังไม่มีข้อมูลเวลาของ Part นี้ (API ยังไม่ส่ง current_part_time_dist)</p>';
 
   $('last-updated').textContent = new Date().toLocaleTimeString('en-GB');
 }
 
 function renderProductTable(d) {
+  // rows ผ่าน normalizeRange / mockProducts มาแล้ว — ไม่ต้อง normalize ซ้ำ
   const { rows, mock } = getRangeData(d, 'products', state.productRange);
   $('product-source').innerHTML = sourceBadge(mock);
   const target = settings.targetOee;
@@ -1799,14 +2110,18 @@ function renderProductTable(d) {
 
   const q = $('searchInput').value.trim().toLowerCase();
   const list = rows.filter(p => !q || String(p.job).toLowerCase().includes(q) || String(p.part).toLowerCase().includes(q));
+  state.visibleProducts = list;
 
-  $('product-tbody').innerHTML = list.length ? list.map(p => {
+  // ไม่ใช้ onclick แบบฝัง string (กัน XSS) — ใช้ data-idx + event delegation แทน
+  $('product-tbody').innerHTML = list.length ? list.map((p, i) => {
     const color = p.oee >= target ? 'bg-emerald-500' : (p.oee >= target - 10 ? 'bg-amber-500' : 'bg-red-500');
     return `
-      <tr class="transition hover:bg-slate-50/80 dark:hover:bg-slate-700/50">
+      <tr data-idx="${i}" tabindex="0" class="cursor-pointer transition hover:bg-slate-50/80 focus:outline-none focus-visible:bg-blue-50 dark:hover:bg-slate-700/50 dark:focus-visible:bg-slate-700">
         <td class="whitespace-nowrap px-6 py-4 font-semibold text-slate-900 dark:text-white">${escapeHTML(p.job)}</td>
         <td class="px-6 py-4 text-slate-600 dark:text-slate-300">${escapeHTML(p.part)}</td>
         <td class="px-6 py-4 text-right tabular-nums">${fmt(p.produced)}</td>
+        <td class="px-6 py-4 text-right font-medium tabular-nums" style="color:${PALETTE.setup}">${fmt(p.setup)}</td>
+        <td class="px-6 py-4 text-right font-medium tabular-nums" style="color:${PALETTE.qc}">${fmt(p.qc)}</td>
         <td class="px-6 py-4 text-right tabular-nums text-red-500">${fmt(p.defect, 1)}%</td>
         <td class="px-6 py-4">
           <div class="flex items-center gap-3">
@@ -1817,7 +2132,7 @@ function renderProductTable(d) {
           </div>
         </td>
       </tr>`;
-  }).join('') : '<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">No results found.</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="px-6 py-12 text-center text-slate-400">No results found.</td></tr>';
 }
 
 function renderDailySummary(d) {
@@ -1831,18 +2146,19 @@ function renderDailySummary(d) {
 
 function renderPareto(d) {
   const chart = state.charts.pareto;
-  if (!chart) return;
   const { rows: raw, mock } = getRangeData(d, 'pareto', state.paretoRange);
   const { rows, total, vitalCount } = analyzePareto(raw);
-  const c = chartColors();
-
   $('pareto-source').innerHTML = sourceBadge(mock);
-  chart.data.labels = rows.map(r => r.label);
-  chart.data.datasets[0].data = rows.map(r => round2(r.cumulative));
-  chart.data.datasets[1].data = rows.map(() => 80);
-  chart.data.datasets[2].data = rows.map(r => r.value);
-  chart.data.datasets[2].backgroundColor = rows.map((_, i) => (i < vitalCount ? 'rgba(239,68,68,.85)' : c.muted));
-  chart.update('none');
+
+  if (chart) {
+    const c = chartColors();
+    chart.data.labels = rows.map(r => r.label);
+    chart.data.datasets[0].data = rows.map(r => round2(r.cumulative));
+    chart.data.datasets[1].data = rows.map(() => 80);
+    chart.data.datasets[2].data = rows.map(r => r.value);
+    chart.data.datasets[2].backgroundColor = rows.map((_, i) => (i < vitalCount ? 'rgba(239,68,68,.85)' : c.muted));
+    chart.update('none');
+  }
 
   const top = rows[0];
   $('pareto-summary').innerHTML = [
@@ -1867,6 +2183,7 @@ function chartColors() {
 }
 
 function initCharts() {
+  if (!window.Chart) { console.warn('Chart.js not loaded — charts disabled'); return; }
   const c = chartColors();
   Chart.defaults.color = c.text;
   Chart.defaults.font.family = 'Inter, "Noto Sans Thai", sans-serif';
@@ -1894,7 +2211,7 @@ function initCharts() {
     type: 'doughnut',
     data: {
       labels: TIME_DIST.map(t => t.label),
-      datasets: [{ data: [1, 1, 1], backgroundColor: TIME_DIST.map(t => t.color), borderWidth: 0 }],
+      datasets: [{ data: Array(TIME_DIST.length).fill(1), backgroundColor: TIME_DIST.map(t => t.color), borderWidth: 0 }],
     },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '75%',
@@ -1925,6 +2242,7 @@ function initCharts() {
 }
 
 function applyChartTheme() {
+  if (!window.Chart) return;
   const c = chartColors();
   Chart.defaults.color = c.text;
   const { trend, time, pareto } = state.charts;
@@ -1941,8 +2259,7 @@ function applyChartTheme() {
 
 function updateThemeIcon() {
   const dark = document.documentElement.classList.contains('dark');
-  $('themeToggleIconDark').classList.toggle('hidden', !dark);
-  $('themeToggleIconLight').classList.toggle('hidden', dark);
+  $('themeToggleIconDark').classList.toggle('hidden', !dark);$('themeToggleIconLight').classList.toggle('hidden', dark);
 }
 
 /* =========================================================
@@ -1950,15 +2267,18 @@ function updateThemeIcon() {
  * ========================================================= */
 function tickClock() {
   const now = new Date();
-  $('clock-time').textContent = now.toLocaleTimeString('en-GB');
-  $('clock-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  $('clock-time').textContent = now.toLocaleTimeString('en-GB');$('clock-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+  // อัปเดตวันที่สูงสุดของปฏิทินเมื่อข้ามเที่ยงคืน
+  const today = todayISO();
+  const dateInput = $('summaryDate');
+  if (dateInput.max !== today) dateInput.max = today;
 }
 
 function startApp() {
   if (state.started) return;
   state.started = true;
   $('sidebar-user').textContent = currentUser();
-  state.assetsPromise = preloadPdfAssets();
   showSection(state.activeSection);
   pollData();
 }
@@ -1970,43 +2290,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Login
   $('loginForm').addEventListener('submit', handleLogin);
-  ['loginUser', 'loginPass'].forEach(id => $(id).addEventListener('input', () => $('login-error').classList.add('hidden')));
+  ['loginUser', 'loginPass'].forEach(id => $(id).addEventListener('input', () =>$('login-error').classList.add('hidden')));
 
   // Navigation
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.section)));
-  $('logoHome').addEventListener('click', () => showSection('overview'));
-  $('openSidebar').addEventListener('click', () => {
-    $('sidebar').classList.remove('-translate-x-full');
-    $('sidebarOverlay').classList.remove('hidden');
+  $('logoHome').addEventListener('click', () => showSection('overview'));$('openSidebar').addEventListener('click', () => {
+    $('sidebar').classList.remove('-translate-x-full');$('sidebarOverlay').classList.remove('hidden');
   });
   $('closeSidebar').addEventListener('click', () => {
-    $('sidebar').classList.add('-translate-x-full');
-    $('sidebarOverlay').classList.add('hidden');
+    $('sidebar').classList.add('-translate-x-full');$('sidebarOverlay').classList.add('hidden');
   });
-  $('sidebarOverlay').addEventListener('click', () => $('closeSidebar').click());
+  $('sidebarOverlay').addEventListener('click', () =>$('closeSidebar').click());
 
-  // Overview cards (event delegation — ปลอดภัยกว่า onclick แบบฝัง string)
-  $('overview-grid').addEventListener('click', (e) => {
-    const card = e.target.closest('[data-machine]');
-    if (card) jumpToMachine(card.dataset.machine);
-  });
-  $('overview-grid').addEventListener('keydown', (e) => {
+  // Overview cards (event delegation)
+  $('overview-grid').addEventListener('click', (e) => { const card = e.target.closest('[data-machine]'); if (card) jumpToMachine(card.dataset.machine); });$('overview-grid').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const card = e.target.closest('[data-machine]');
     if (card) { e.preventDefault(); jumpToMachine(card.dataset.machine); }
   });
 
+  // Product table (event delegation — กัน XSS)
+  const openProductRow = (tr) => {
+    const p = state.visibleProducts[Number(tr.dataset.idx)];
+    if (p) viewPartDetails(p, currentMachine()?.machineName ?? '-');
+  };
+  $('product-tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-idx]'); if (tr) openProductRow(tr); });$('product-tbody').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr[data-idx]');
+    if (tr) { e.preventDefault(); openProductRow(tr); }
+  });
+
+  // Modal: คลิกพื้นหลัง / กด Esc เพื่อปิด
+  $('part-details-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closePartModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closePartModal(); closeSidebarMobile(); }
+  });
+
+  // Timeline: สลับ 08:30–17:30 / 24 ชั่วโมง
+  $('tl-range').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-hours]');
+    if (!btn) return;
+    state.timelineHours = Number(btn.dataset.hours);
+    renderActiveSection();
+  });
+
   // Machine selector & filters
-  $('globalMachineSelect').addEventListener('change', (e) => { state.selectedMachine = e.target.value; renderActiveSection(); });
-  $('searchInput').addEventListener('input', () => { if (state.activeSection === 'oee-product') renderActiveSection(); });
-  $('productRange').addEventListener('change', (e) => { state.productRange = parseInt(e.target.value, 10); renderActiveSection(); });
-  $('paretoRange').addEventListener('change', (e) => { state.paretoRange = parseInt(e.target.value, 10); renderActiveSection(); });
+  $('globalMachineSelect').addEventListener('change', (e) => { state.selectedMachine = e.target.value; renderActiveSection(); });$('searchInput').addEventListener('input', () => { if (state.activeSection === 'oee-product') renderActiveSection(); });
+  $('productRange').addEventListener('change', (e) => { state.productRange = parseInt(e.target.value, 10); renderActiveSection(); });$('paretoRange').addEventListener('change', (e) => { state.paretoRange = parseInt(e.target.value, 10); renderActiveSection(); });
 
   // Daily summary
-  $('summaryDate').value = todayISO();
-  $('summaryDate').max = todayISO();
-  $('summaryDate').addEventListener('change', () => renderActiveSection());
-  $('btnViewLogs').addEventListener('click', loadDailySummary);
+  $('summaryDate').value = todayISO();$('summaryDate').max = todayISO();
+  $('summaryDate').addEventListener('change', () => renderActiveSection());$('btnViewLogs').addEventListener('click', loadDailySummary);
 
   // Theme toggle
   $('themeToggle').addEventListener('click', () => {
@@ -2015,6 +2349,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateThemeIcon();
     applyChartTheme();
     renderActiveSection();
+  });
+
+  // หยุด polling เมื่อแท็บถูกซ่อน และเริ่มใหม่ทันทีเมื่อกลับมา
+  document.addEventListener('visibilitychange', () => {
+    if (state.started && !document.hidden) pollData();
   });
 
   // Clock & year
@@ -2029,3 +2368,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+```<ElicitationsGroup>
+</ElicitationsGroup>
